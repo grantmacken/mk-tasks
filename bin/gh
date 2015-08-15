@@ -1,0 +1,948 @@
+ #!/usr/bin/env bash
+###########################################
+[ ! -e "config" ] &&  exit
+[ ! -e "../common.properties" ] &&  exit
+[ ! -e "../project.properties" ] &&  exit
+[ ! -d "$HOME/bin/gh-includes" ]  &&  exit
+
+source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+if [ -z "$NAME" ] ; then
+  exit
+fi
+source "../common.properties"
+# setup some common dirs
+[ ! -d "$GITHUB_DIR" ] &&  mkdir -p $GITHUB_DIR/etags $GITHUB_DIR/headers
+[ ! -d "$GITHUB_DIR/issue" ] &&  mkdir -p $GITHUB_DIR/issue
+[ ! -d "$TEMP_DIR" ] &&  mkdir $TEMP_DIR
+[ ! -d "$LOG_DIR" ] &&  mkdir $LOG_DIR
+source "../project.properties"
+imports="$USER_BIN/gh-includes"
+files=(repo usage parse on-branch on-master release-strategy input pull-request)
+if [ -d ${imports} ];then
+  for f in "${files[@]}"
+  do
+    if [ -e  ${imports}/${f}.sh ] ; then
+      #echo "Import $f as source"
+      chmod +x ${imports}/${f}.sh
+      source ${imports}/${f}.sh
+    fi
+  done
+  #echo "Export functions found in source so they can be used in subscripts"
+  funcNames=$( declare -F | cut -d" " -f3 )
+  for i in ${funcNames}
+  do
+      #echo ${i}
+      export -f ${i}
+  done
+ else
+  echo "ERR!:  link to imports not set up yet"
+  exit 1
+fi
+options=()
+while getopts "h r l v" OPTION
+do
+  case $OPTION in
+    h)
+      if ghUsage ; then
+        exit 1
+      fi
+    ;;
+    l)
+      if ghListAvailableRequests ; then
+          exit 0
+      fi
+    ;;
+    r)
+      HOST="$HOST_REMOTE"
+    ;;
+    *)
+  ;;
+  esac
+done  
+if [ -z "${HOST}" ] ; then
+  HOST="${HOST_LOCAL}"
+fi
+#echo "INFO! - *HOST* [ ${HOST} ]"
+
+ARGS_COUNT=$#
+REQUEST=
+
+request=
+requestFile=
+# return patterns
+# simple
+# empty, boolean
+returns=
+
+declare -a ARGS
+declare -a params
+
+if [ ! $ARGS_COUNT -gt 0 ]; then
+  ghUsage
+  exit 0
+fi
+
+#echo "INFO! - *ARGUMENTS* [ ${ARGUMENTS} ]"
+REQUEST=$1
+echo "#${REQUEST}#"
+#echo "INFO! - *GIT_USER_NAME* [ ${GIT_USER} ]"
+#echo "INFO! - *GITHUB_ACCESS_TOKEN* [ ${GITHUB_ACCESS_TOKEN} ]"
+#echo "INFO! - *PROJECT_NAME* [ ${PROJECT_NAME} ]"
+#echo "INFO! - *HOST* [ ${HOST} ]"
+#echo "INFO! - *REQUEST*: [ ${REQUEST} ]"
+## if we have a extended request or a interpolation heredoc
+## then create the request from these
+#echo "INFO! - *ARGS_COUNT* [ ${ARGS_COUNT} ]"
+if [ $ARGS_COUNT -eq 1 ]; then
+  if [ -e "${BIN_DIR}/request/${REQUEST}.sh" ] ; then
+	chmod +x "${BIN_DIR}/request/${REQUEST}.sh"
+	#payload=$( ${BIN_DIR}/payload/${REQUEST}.sh )
+  fi
+  ARGS=()
+else
+  shift
+  ARGS=("$@")
+  echo "INFO! - *ARGS* [ ${ARGS[@]} ]"
+  # when we want to interpolate useing a heredoc
+  if [ -e "${BIN_DIR}/request/${REQUEST}.sh" ] ; then
+	chmod +x "${BIN_DIR}/request/${REQUEST}.sh"
+	#payload=$( ${BIN_DIR}/payload/${REQUEST}.sh  "${ARGS}")
+  fi
+fi
+
+params=()
+jsnREPO=
+thenDo=
+
+
+if [ "$REQUEST"  = 'get-repo' ]
+then
+  echo "INFO! get the repo before any other calls"
+else
+ [ -e ${JSN_REPO} ]  || {
+  echo "FAILURE! no file ${JSN_REPO}"
+  exit 1
+  } && {
+  parseRepo || exit 1
+  }
+fi
+
+
+[ -n "${GIT_REPO_FULL_NAME}" ]  || exit 1
+API_REPO="${REPO_BASE_URL}/repos/${GIT_REPO_FULL_NAME}"
+DO="$(echo "$REQUEST" | sed -r 's/-(.+)//g' )"
+echo "TASK! *DO* : [ $DO ]"
+#COLLECTION_NAME=
+#GET_COLLECTION=
+#if [ "$DO" = 'create' ] || [ "$DO" = 'delete' ] ; then
+#  COLLECTION_NAME="$(echo "$REQUEST" | sed -r 's/(\w+)-//g' )"
+#  echo "INFO! *COLLECTION_NAME* : [ $COLLECTION_NAME ]"
+#  GET_COLLECTION="get-${COLLECTION_NAME}s"
+#  echo "TASK! *AFTER REQUEST - GET_COLLECTION* : [ $GET_COLLECTION ]"
+#fi
+
+#echo '.github/merge.json' | sed s/\.json/\.etag/
+# echo '.github/merge.json' | sed s%^\.%\./\.%
+
+case "$REQUEST" in
+#LIST-START#
+  get-repo)
+  params=( )
+  method='GET'
+  requestURL="${API_REPO}"
+  outFile="${JSN_REPO}"
+  thenDo='get-repo-lists'
+  ;;
+  info-repo)
+  params=( )
+  node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
+  #parseRepo
+  exit
+  ;;
+  get-repo-lists)
+  params=( )
+  repoLists
+  exit
+# BRANCHES
+  ;;
+  get-branches)
+  params=( )
+  method='GET'
+  requestURL="${REPO_BRANCHES_URL}"
+  outFile="${JSN_BRANCHES}"
+  ;;
+  info-branch)
+  branchInfo || exit
+  exit
+  ;;
+  create-branch-from-issue)
+  params=( )
+  branchInfo
+  branchIsMaster ||  exit
+  parseIntoArrayIssuesForBranches || exit
+  inputSelectIssueForBranch  || exit
+  parseBranchName "${BRANCH_SELECTED}" || exit
+  omCreateBranch || exit
+  gh 'get-current-issue'
+  exit
+  ;;
+  select-issue-for-branch)
+  params=( )
+  options=()
+  parseIntoArrayIssuesForBranches || exit
+  for i in "${!ISSUES_FOR_BRANCHES[@]}"
+      do
+         item=$( echo "${ISSUES_FOR_BRANCHES[i]}" )
+         options+=("${item}")
+      done
+  echo "INPUT! Select issue for branch"
+  utilitySelectOption 'BRANCH_SELECTED' || exit
+  echo "INFO! - *BRANCH_SELECTED*: [ ${BRANCH_SELECTED} ]"
+  exit
+  ;;
+  branch-when-on-master)
+  params=( )
+  branchWhenOnMaster
+  params=( )
+  exit
+  ;;
+# LABELS
+# https://developer.github.com/v3/issues/labels/
+  get-labels)
+  params=( )
+  method='GET'
+  requestURL="${REPO_LABELS_URL}"
+  outFile="${JSN_LABELS}"
+  ;;
+  delete-label)
+  params=( name )
+  method='DELETE'
+  requestURL="${REPO_LABELS_URL}/${1}"
+  outFile=
+  ;;
+  create-label)
+  params=(name color)
+  method='POST'
+  requestURL="${REPO_LABELS_URL}"
+  [ ! -d "$GITHUB_DIR/label" ] &&  mkdir -p $GITHUB_DIR/label
+  outFile="$GITHUB_DIR/label/${1}.json"
+  jsn="{\"name\":\"${1}\",\"color\":\"${2}\"}"
+  expectResponse=201
+  ;;
+  default-labels)
+  params=( )
+  for item in "${ISSUE_BRANCH_TYPES[@]}";
+    do
+      gh create-label "${item}" "${LABEL_COLOR[$item]}"
+    done
+  exit
+  ;;
+  list-label-names)
+  params=( )
+  gh get-labels
+  jsnLABELS=$(<${JSN_LABELS})
+  #echo "${jsnMILESTONES}" | jq -r -c '.[] | [ .title ] '
+  #echo "${jsnMILESTONES}" | R -p  'identity'
+  echo "${jsnLABELS}" | R  'project [\name]'  -o table
+  exit
+  ;;
+  parse-labels)
+  params=( )
+  parseIntoArrayLabels
+  exit
+  ;;
+  select-label)
+  params=( )
+  options=()
+  for item in "${ISSUE_BRANCH_TYPES[@]}"
+      do
+         options+=("$(echo "${item}")")
+      done
+  #options+=("OK")
+  echo "INFO! From options select *ISSUE_LABEL*"
+  if ! utilitySelectOption 'LABEL_SELECTED' ; then
+      return 1
+  fi
+  echo "INFO! - LABEL_SELECTED [ ${LABEL_SELECTED} ]"
+  exit
+  ;;
+# MILESTONES
+# https://developer.github.com/v3/issues/milestones/
+  default-milestones)
+  params=( )
+  for item in "${RELEASE_MILESTONES[@]}";
+    do
+      gh create-milestone "strategy-${item}" "${RELEASE_STRATEGY[$item]}"
+    done
+  exit
+  ;;
+  get-milestones)
+  params=( )
+  method='GET'
+  requestURL="${REPO_MILESTONES_URL}"
+  outFile="${JSN_MILESTONES}"
+  ;;
+  create-milestone)
+  params=(title description)
+  method='POST'
+  requestURL="${REPO_MILESTONES_URL}"
+  outFile="${JSN_MILESTONES}"
+  jsn="{\"title\":\"${1}\",\"state\":\"open\",\"description\":\"${2}\"}"
+  expectResponse=201
+  ;;
+  delete-milestone)
+  params=(number)
+  method='DELETE'
+  requestURL="${REPO_MILESTONES_URL}"
+  expectResponse=204
+  outFile=
+  ;;
+  list-milestone-titles)
+  params=( )
+  #gh get-labels
+  jsnMILESTONES=$(<${JSN_MILESTONES})
+  #echo "${jsnMILESTONES}" | jq -r -c '.[] | [ .title ] '
+  #echo "${jsnMILESTONES}" | R -p  'identity'
+  echo "${jsnMILESTONES}" | R   'project [\number \title \description]'  -o table
+  exit
+  ;;
+  select-milestone)
+  params=( )
+  #gh get-labels
+  utilitySelectNumber 'Enter Number' "${JSN_MILESTONES}"
+  exit
+  ;;
+  picked-milestone)
+  params=(number)
+  jsnMILESTONES=$(<${JSN_MILESTONES})
+  echo "${jsnMILESTONES}" | R  "filter where-eq number: $1" 'project [\number \title \description]'  -o table
+  exit
+  ;;
+# ISSUES
+  parse-branch-name)
+  params=( )
+  parseBranchName
+  exit
+  ;;
+  new-issue-md)
+  params=( )
+  #gh get-issues
+  parseFetchedIssues  > /dev/null
+  omSetIssuesForBranches > /dev/null
+  omNewIssueMD
+  exit
+  ;;
+  create-issue)
+  params=( )
+  parseIssueMD > /dev/null
+  omSetJsonFromIssueMD 'jsn'
+  jsn=$(echo "${jsn}")
+  method='POST'
+  requestURL="${REPO_ISSUES_URL}"
+  outFile="${JSN_ISSUE}"
+  expectResponse=201
+  thenDo='get-issues'
+  ;;
+  patch-issue)
+  params=( )
+  ISSUE_NUMBER="$(echo "$(<${JSN_ISSUE})" | jq '.number')"
+  parseIssueMD
+  omSetJsonFromIssueMD 'jsn'
+  echo "${jsn}"
+  jsn=$(echo "${jsn}")
+  method='PATCH'
+  requestURL="${REPO_ISSUES_URL}/${ISSUE_NUMBER}"
+  outFile="${JSN_ISSUE}"
+  expectResponse=200
+  thenDo='get-issues'
+  ;;
+  get-issues)
+  params=( )
+  method='GET'
+  requestURL="${REPO_ISSUES_URL}"
+  outFile="${JSN_ISSUES}"
+  ;;
+  list-issues)
+  params=( )
+  jsnISSUES=$(<${JSN_ISSUES})
+  echo "${jsnISSUES}" | R  'project [\number \title \state ]'  -o table
+  exit
+  ;;
+  parse-issues)
+  params=( )
+  parseFetchedIssues
+  exit
+  ;;
+  get-issue)
+  params=(number)
+  method='GET'
+  baseURL="${REPO_ISSUES_URL}"
+  requestURL="${baseURL}/${1}"
+  outFile="${JSN_ISSUE}"
+  ;;
+  get-current-issue)
+  params=( )
+  method='GET'
+  parseBranchName
+  baseURL="${REPO_ISSUES_URL}"
+  requestURL="${baseURL}/${PARSED_ISSUE_NUMBER}"
+  outFile="${JSN_ISSUE}"
+  thenDo='remake-issue'
+  ;;
+  sync-issue)
+  params=( )
+  branchSyncIssue
+  exit
+  ;;
+  commit-issue-task)
+  params=( )
+  branchCommitOnCompletedTask
+  exit
+  ;;
+  parse-issue)
+  params=( )
+  parseFetchedIssue
+  exit
+  ;;
+  parse-issue_md)
+  params=( )
+  parseIssueMD
+  exit
+  ;;
+  remake-issue)
+  params=( )
+  parseFetchedIssue
+  cat << EOF | tee ${ISSUE_FILE}
+<!--
+ISSUE_TITLE="${FETCHED_ISSUE_TITLE}"
+ISSUE_LABEL="${FETCHED_ISSUE_LABEL}"
+ISSUE_MILESTONE="${FETCHED_ISSUE_MILESTONE_TITLE}"
+-->
+${FETCHED_ISSUE_BODY}
+EOF
+  exit
+  ;;
+  get-issue-events)
+  params=( )
+  method='GET'
+  parseFetchedIssue
+  requestURL="${FETCHED_EVENTS_URL}"
+  outFile="${JSN_ISSUE_EVENTS}"
+  thenDo='list-issue-events'
+  ;;
+  list-issue-events)
+  params=( )
+  echo "$(<${JSN_ISSUE_EVENTS})" | R  'project [\id \event]'  -o table
+  ;;
+  get-issue-comments)
+  params=( )
+  method='GET'
+  parseFetchedIssue
+  requestURL="${FETCHED_COMMENTS_URL}"
+  outFile="${JSN_ISSUE_COMMENTS}"
+  thenDo='list-issue-comments'
+  ;;
+  list-issue-comments)
+  params=( )
+  echo "$(<${JSN_ISSUE_COMMENTS})" | R  'project [\id \body]'  -o table
+  ;;
+  semver)
+  params=( )
+  branchNewBuildSemver
+  exit
+  ;;
+  parse-issue-md)
+  params=( )
+  parseIssueMD
+  exit
+  ;;
+# PULLS
+  get-pulls)
+  params=( )
+  method='GET'
+  requestURL="${REPO_PULLS_URL}"
+  outFile="${JSN_PULLS}"
+  ;;
+  prior-pull-request)
+  params=( )
+  prPriorPullRequest || exit
+  exit
+  ;;
+  create-pull-request)
+  params=( )
+  method='POST'
+  requestURL="${REPO_PULLS_URL}"
+  outFile="${JSN_PULL_REQUEST}"
+  prPriorPullRequest || exit
+  issueNumber=${FETCHED_ISSUE_NUMBER}
+  issueHead=${CURRENT_BRANCH}
+  jsn="{\"issue\":\"${issueNumber}\",\"head\":\"${issueHead}\",\"base\":\"master\"}"
+  expectResponse=201
+  ;;
+  get-pull-request)
+  params=(number)
+  method='GET'
+  baseURL="${REPO_PULLS_URL}"
+  requestURL="${baseURL}/${1}"
+  outFile="${JSN_PULL_REQUEST}"
+  ;;
+  get-current-pull-request)
+  params=( )
+  method='GET'
+  parseFetchedIssue > /dev/null
+  baseURL="${REPO_PULLS_URL}"
+  requestURL="${baseURL}/${FETCHED_ISSUE_NUMBER}"
+  outFile="${JSN_PULL_REQUEST}"
+  ;;
+  delete-pull-request)
+  params=( )
+  rm ${JSN_PULL_REQUEST}
+  #TODO!
+  #method='GET'
+  #baseURL=$(node -pe "require('${GITHUB_REPO}')['pulls_url']" | sed -r 's/\{.+//g')
+  #requestURL="${baseURL}/${1}"
+  #outFile="${JSN_PULL_REQUEST}"
+  exit
+  ;;
+  parse-pull-request)
+  params=( )
+  parsePullRequest
+  exit
+# MERGING A PULL-REQUEST
+  ;;
+  info-pr-merge-state)
+  gh 'get-current-pull-request' || exit
+  gh 'get-pr-combined-status' || exit
+  parsePullRequest > /dev/null
+  parseCombinedStatus > /dev/null
+  echo "INFO! - *PR_MERGED*: [ ${PR_MERGED} ]"
+  echo "INFO! - *PR_MERGEABLE*: [ ${PR_MERGEABLE} ]"
+  echo "INFO! - *PR_MERGEABLE_STATE*: [ ${PR_MERGEABLE_STATE} ]"
+  echo "INFO! - *PR_COMBINED_STATUS_STATE*: [ ${PR_COMBINED_STATUS_STATE} ]"
+  exit
+  ;;
+  merge-pull-request)
+  params=( )
+  gh 'get-current-pull-request' || exit
+  gh 'get-pr-combined-status' || exit
+  gh 'get-pr-commits' || exit
+  parsePullRequest > /dev/null
+  parseCombinedStatus > /dev/null
+  prPriorMerge || exit
+  #parsePullRequest
+  commitMessage="pull request merged #${ISSUE_NUMBER} summary - ${ISSUE_SUMMARY}"
+  jsn="{\"commit_message\":\"${commitMessage}\", \"sha\":\"${PR_HEAD_SHA}\"}"
+  echo "$jsn" | R -p 'id'
+  method='PUT'
+  requestURL="${PR_URL}/merge"
+  outFile="${JSN_PR_MERGE}"
+  expectResponse=200
+  #thenDo='merged-pull-request'
+  ;;
+  parse-merged)
+  params=( )
+  parseMerged
+  exit
+  ;;
+  merged-pull-request)
+  params=( )
+  gh 'get-current-pull-request' || exit
+  parsePullRequest > /dev/null
+  mergedPullRequest
+  exit
+  ;;
+  get-pr-lists)
+  prLists || exit
+  exit
+ ;;
+# PR COMMITS
+  get-pr-commits)
+  params=( )
+  parsePullRequest >  /dev/null
+  echo "INFO! - *PR_COMMITS_URL*: [ ${PR_COMMITS_URL} ]"
+  method='GET'
+  requestURL="${PR_COMMITS_URL}"
+  outFile="${JSN_PR_COMMITS}"
+  ;;
+  list-pr-commits)
+  params=( )
+  echo "$(<${JSN_PR_COMMITS})" | R  -p 'pluck [\commit]' 'pluck [\message]'
+  exit
+ ;;
+# PR COMMENTS
+  get-pr-comments)
+  params=( )
+  parsePullRequest >  /dev/null
+  #echo "INFO! - *PR_COMMENTS_URL*: [ ${PR_COMMENTS_URL} ]"
+  method='GET'
+  requestURL="${PR_COMMENTS_URL}"
+  outFile="${JSN_PR_COMMENTS}"
+  thenDo='list-pr-comments'
+  ;;
+  list-pr-comments)
+  params=( )
+  jsnPR_COMMENTS=$(<${JSN_PR_COMMENTS})
+  echo "${jsnPR_COMMENTS}" | R  'project [\id \body ]'  -o table
+  exit
+  ;;
+  get-pr-comment)
+# GET /repos/:owner/:repo/issues/comments/:id
+  params=( id )
+  method='GET'
+  parsePullRequest >  /dev/null
+  jsnPR_COMMENTS=$(<${JSN_PR_COMMENTS})
+  baseURL="${REPO_ISSUE_COMMENT_URL}"
+  requestURL="${baseURL}/${1}"
+  outFile="${JSN_PR_COMMENT}"
+  ;;
+  create-pr-comment)
+#  POST /repos/:owner/:repo/issues/:number/comments
+  params=( body )
+  parsePullRequest >  /dev/null
+  echo "INFO! - *PR_COMMENTS_URL*: [ ${PR_COMMENTS_URL} ]"
+  method='POST'
+  jsn=
+  echo "${1[@]}" | R -p 'id'
+  exit
+  requestURL="${PR_COMMENTS_URL}"
+  outFile="${JSN_PR_COMMENT}"
+  thenDo='get-pr-comments'
+  ;;
+  create-pr-compare-url-comment)
+  params=( )
+  parsePullRequest >  /dev/null
+  echo "INFO! *PR_COMMENTS_URL*: [${PR_COMMENTS_URL}]"
+  echo "INFO! *REPO_HTML_URL*: [ ${REPO_HTML_URL}] "
+  LONG_URL="${REPO_HTML_URL}/compare/${PR_BASE_SHA}...${PR_HEAD_SHA}"
+  echo "INFO! *LONG_URL*: [ ${LONG_URL} ] "
+  headerDump="${GITHUB_DIR}/headers/short_url.txt"
+  doRequest=$(
+  curl -s \
+    -i  \
+    -F "url=${LONG_URL}" \
+    -w %{http_code} \
+    -o  /dev/null \
+    --dump-header  ${headerDump} \
+    http://git.io
+  )
+  case "${doRequest}" in
+    201)
+      echo "OK! response ${doRequest}. OK"
+      SHORT_URL="$(echo "$(<${headerDump})" | grep -oP '^Location: \K(\S+)')"
+    ;;
+    *)
+      echo "FAILURE! response ${doRequest}."
+      exit
+  esac
+  txt="changes proposed at the [compare-url]($SHORT_URL)"
+  echo "${txt}"
+  jsn="{\"body\":\"${txt}\"}"
+  echo "$jsn" | R -p 'id'
+  method='POST'
+  requestURL="${PR_COMMENTS_URL}"
+  outFile="${JSN_PR_COMMENT}"
+  thenDo='get-pr-comments'
+  ;;
+  create-pr-shipit-comment)
+  params=( )
+  parsePullRequest >  /dev/null
+  echo "INFO! *PR_COMMENTS_URL*: [${PR_COMMENTS_URL}]"
+  txt=":shipit: approve"
+  jsn="{\"body\":\"${txt}\"}"
+  method='POST'
+  requestURL="${PR_COMMENTS_URL}"
+  outFile="${JSN_PR_COMMENT}"
+  thenDo='get-pr-comments'
+  ;;
+  delete-pr-comment)
+  params=( id )
+  method='DELETE'
+  parsePullRequest >  /dev/null
+  jsnPR_COMMENTS=$(<${JSN_PR_COMMENTS})
+  baseURL="${REPO_ISSUE_COMMENT_URL}"
+  requestURL="${baseURL}/${1}"
+  outFile="${JSN_PR_COMMENT}"
+  ;;
+# PR COMBINED STATUS
+  get-pr-combined-status)
+#Additionally, a combined state is returned. The state is one of:
+#failure if any of the contexts report as error or failure
+#pending if there are no statuses or a context is pending
+#success if the latest status for all contexts is success
+  params=( )
+  parsePullRequest > /dev/null
+  PR_COMBINED_STATUS_URL="${REPO_COMMITS_URL}/${PR_HEAD_SHA}/status"
+  echo "INFO! - *PR_COMBINED_STATUS_URL*: [ ${PR_COMBINED_STATUS_URL} ]"
+  #echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
+  method='GET'
+  requestURL="${PR_COMBINED_STATUS_URL}"
+  outFile="${JSN_PR_COMBINED_STATUS}"
+  thenDo='parse-pr-combined-status'
+  ;;
+  parse-pr-combined-status)
+  parseCombinedStatus
+  exit
+  ;;
+# PR STATUSES
+#The Status API allows external services to mark commits with a success,
+#failure, error, or pending state, which is then reflected in pull requests
+#involving those commits.
+  get-pr-statuses)
+  params=( )
+  parsePullRequest  > /dev/null
+  echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
+  method='GET'
+  requestURL="${PR_STATUSES_URL}"
+  outFile="${JSN_PR_STATUSES}"
+  ;;
+  create-pr-default-success-status)
+  params=( )
+  parsePullRequest  > /dev/null
+  echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
+  method='POST'
+  requestURL="${PR_STATUSES_URL}"
+  outFile="${JSN_PR_STATUSES}"
+  jsn="{\"state\":\"success\",\"description\":\"All good\",\"context\":\"default\"}"
+  expectResponse=201
+  ;;
+  parse-pr-statuses)
+  params=( )
+  parsePullRequest  > /dev/null
+  echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
+  echo "$(<${JSN_PR_STATUSES})" | R  'project [\id \state \context \description ]'  -o table
+  exit
+  ;;
+# TAGS
+#https://developer.github.com/v3/repos/#list-tags
+  get-tags)
+  params=( )
+  method='GET'
+  requestURL="${REPO_TAGS_URL}"
+  outFile="${GITHUB_TAGS}"
+  ;;
+  list-tags)
+  params=( )
+  jsnTAGS=$(<${JSN_TAGS})
+  echo "${jsnTAGS}" | jq -r -c '.[] | [ .name ] '
+  exit
+  ;;
+  latest-tag)
+  params=( )
+  parseTags
+  exit
+  ;;
+#RELEASES
+# https://developer.github.com/changes/2013-09-25-releases-api/
+# https://developer.github.com/v3/repos/releases
+  get-releases)
+  params=( )
+  method='GET'
+  requestURL="${REPO_RELEASES_URL}"
+  outFile="${JSN_RELEASES}"
+  ;;
+  list-releases)
+  params=( )
+  jsnRELEASES=$(<${JSN_RELEASES})
+  echo "${jsnRELEASES}" | jq -r -c '.[] | [ .tag_name , .name , .id ] '
+  exit
+  ;;
+  get-latest-release)
+  params=( )
+  method='GET'
+  baseURL="${REPO_RELEASES_URL}"
+  requestURL="${baseURL}/latest"
+  outFile="${JSN_LATEST_RELEASE}"
+  ;;
+  parse-latest-release)
+  params=( )
+  parseLatestRelease
+  exit
+  ;;
+  list-releases)
+  jsnRELEASES="{REPO_RELEASES_URL}"
+  echo "${jsnRELEASES}" | jq -r -c '.[] | [ .tag_name , .name , .id ] '
+  exit
+  ;;
+  update-semver)
+  params=( )
+  omUpdateSemver
+  exit
+  ;;
+  release)
+  params=( )
+  parseTags > /dev/null
+  parseIssueMD > /dev/null
+  parseLatestRelease > /dev/null
+  omPriorReleaseConditions
+  omUpdateSemver
+  make build
+  #omCreateAnnotatedTag
+  #gh get-tags
+  parseTags > /dev/null
+  bodyTxt="${ISSUE_LABEL} merged into master \nISSUE - ${ISSUE_TITLE}"
+  nameTxt="${ABBREV}-${LATEST_TAG}"
+  tagNameTxt="${LATEST_TAG}"
+  echo "INFO! *body* [ ${bodyTxt} ] "
+  echo "INFO! *tag_name* [ ${tagNameTxt} ] "
+  echo "INFO! *name* [ ${nameTxt} ] "
+  gh create-release "${tagNameTxt}" "${nameTxt}" "${bodyTxt}"
+  gh get-latest-release
+  gh parse-latest-release
+  gh create-release-asset
+  exit
+  ;;
+  create-release)
+  params=(tag_name name body)
+  method='POST'
+  requestURL="${REPO_RELEASES_URL}"
+  outFile="${JSN_RELEASE}"
+  jsn="{\"tag_name\":\"${1}\",\"target_commitish\":\"master\",\"name\":\"${2}\",\"body\":\"${3}\",\"draft\":\"false\",\"prerelease\":\"false\"}"
+  echo "${jsn}" | R -p 'id'
+  expectResponse=201
+  ;;
+  delete-release)
+  params=(releaseID)
+  method='DELETE'
+  baseURL="{REPO_RELEASES_URL}"
+  requestURL="${baseURL}/${1}"
+  expectResponse=204
+  outFile=
+  ;;
+  parse-release)
+  params=( )
+  parseRelease
+  exit
+  ;;
+#RELEASE ASSETS
+  create-release-asset)
+  params=( )
+  parseLatestRelease > /dev/null
+  method='UPLOAD'
+  requestURL="${RELEASE_UPLOAD_URL}${RELEASE_NAME}"
+  outFile="${JSN_ASSET_UPLOADED}"
+  contentType='application/zip'
+  upFile="pkg/xar/${RELEASE_NAME}.xar"
+  expectResponse=201
+  echo "INFO! *RELEASE_ASSET* [ ${upFile} ] "
+  ;;
+  parse-asset-uploaded)
+  parseAssetUploaded
+  exit
+  ;;
+  list-assets)
+  params=( )
+  jsnRELEASES="$(<${JSN_RELEASES})"
+  echo "${jsnRELEASES}" | jq -r '.[].assets[] |  [.name , .id , .url] '
+  exit
+  ;;
+  delete-asset)
+  params=(assetID)
+  method='DELETE'
+  baseURL="${REPO_RELEASES_URL}"
+  requestURL="${REPO_RELEASES_URL}/assets/${1}"
+  expectResponse=204
+  outFile=
+  ;;
+#LIST-END# 
+ *)
+   echo "FAILURE! *no  query* named ${QUERY}"
+   ghUsage
+   ghListAvailableRequests
+   exit
+ ;;
+esac
+
+echo "INFO! - *requestURL*: [ ${requestURL} ]"
+# if the query has not got correct params then exit
+if [[ "${#params[@]}" -ne "${#ARGS[@]}" ]] ; then
+  if [[ "${#params[@]}" -eq 0 ]] ; then
+  echo "FAILURE! ${QUERY} should have ${#params[@]} parameters"
+  else
+   echo "FAILURE! ${QUERY} should have ${#params[@]} parameters"
+   echo "INFO! - *PARAMS ARE* [ "${params[@]}" ]"
+  fi
+  exit 1
+fi
+
+# https://api.github.com/repos/grantmacken/gmack.nz/releases/assets/417550
+
+case "$method" in
+  GET)
+  # repoFetch <requestURL> <outFile>
+  if repoFetch ${requestURL} ${outFile} ; then
+    if [ -n "${thenDo}" ] ; then
+      echo "INFO! thenDo ${thenDo}"
+      gh "${thenDo}"
+    fi
+	exit 0
+  else
+	exit 1
+  fi
+  ;;
+  POST)
+  # repoCreate <requestURL> <outFile> <jsn>
+  if repoCreate "${requestURL}" "${outFile}" "${jsn}" ; then
+    if [ -n "${thenDo}" ] ; then
+      echo "INFO! thenDo ${thenDo}"
+      gh "${thenDo}"
+    fi
+    #if [ -n "$GET_COLLECTION" ] ; then
+    #  gh "$GET_COLLECTION"
+    #fi
+    #if [ -n "${COLLECTION_NAME}" ] ; then
+    #  [ ! -d "${GITHUB_DIR}/${COLLECTION_NAME}" ] &&  mkdir ${GITHUB_DIR}/${COLLECTION_NAME}
+    #fi
+	exit 0
+  else
+	exit 1
+  fi
+  ;;
+  PUT)
+  # repoCreate <requestURL> <outFile> <jsn>
+  if repoPut "${requestURL}" "${outFile}" "${jsn}" ; then
+    if [ -n "${thenDo}" ] ; then
+      echo "INFO! thenDo ${thenDo}"
+      gh "${thenDo}"
+    fi
+	exit 0
+  else
+	exit 1
+  fi
+  ;;
+  PATCH)
+  # repoCreate <requestURL> <outFile> <jsn>
+  if repoPatch "${requestURL}" "${outFile}" "${jsn}" ; then
+    if [ -n "${thenDo}" ] ; then
+      echo "INFO! thenDo ${thenDo}"
+      gh "${thenDo}"
+    fi
+	exit 0
+  else
+	exit 1
+  fi
+  ;;
+  UPLOAD)
+  echo "INFO! start upload"
+  # repoUpload <requestURL> <outFile>
+  if repoUpload "${requestURL}" "${outFile}" "${upFile}"  "${contentType}" ; then
+	exit 0
+  else
+	exit 1
+  fi
+  ;;
+  DELETE)
+  # repoFetch <requestURL> <outFile>
+  if repoDelete ${requestURL}
+  then
+    if [ -n "${thenDo}" ] ; then
+      echo "INFO! thenDo ${thenDo}"
+      gh "${thenDo}"
+    fi
+	exit 0
+  else
+	exit 1
+  fi
+ ;;
+esac
+
+

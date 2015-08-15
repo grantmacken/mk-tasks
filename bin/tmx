@@ -1,0 +1,186 @@
+#!/bin/bash
+source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+source ../common.properties
+source ../project.properties
+IMPORTS="${USER_BIN}/tmx-includes"
+if [ ! -d ${IMPORTS} ] ; then
+  echo "FAIL! no imports dir"
+  exit
+fi
+if [ -d ${IMPORTS} ];then
+  for f in "mx"
+  do
+    if [ -e  ${IMPORTS}/${f}.sh ] ; then
+      echo "Import $f as source"
+      chmod +x ${IMPORTS}/${f}.sh
+      source ${IMPORTS}/${f}.sh
+    fi
+  done
+  echo "Export functions found in source so they can be used in subscripts"
+  funcNames=$( declare -F | cut -d" " -f3 )
+  for i in ${funcNames}
+  do
+    echo "${i}"
+    export -f ${i}
+  done
+ else
+  echo "ERR!:  link to imports not set up yet"
+  exit 1
+fi
+
+echo "CHECK! - project under git control has remote origin"
+if [ -n "${GIT_REPO_NAME}" ] ; then
+  echo "YEP! - project under git control and has remote origin"
+  echo "INFO! - GIT_REPO_NAME [ ${GIT_REPO_NAME} ]"
+else
+   echo "INFO! -  project *NOT*  has no remote origin under git control"
+fi
+
+
+BASE_SESSION="${GIT_REPO_OWNER_LOGIN}"
+#session_name="${ABBREV}"
+SESSION="$ABBREV"
+echo "CHECK! - is Tmux running?"
+if $(ps -e | grep -q tmux); then
+  echo "YEP! - Tmux is running."
+  tmux list-sessions
+
+ # echo "TASK! - Tmux is running."
+ #  Kill defunct sessions first
+ # old_sessions=$(tmux list-sessions 2>/dev/null | egrep "^[0-9]{14}.*[0-9]+\)$" | cut -f 1 -d:)
+ # for old_session_id in $old_sessions; do
+ #   tmux kill-session -t $old_session_id
+ # done
+ #echo "DONE! - old sessions killed"
+
+else
+   echo "NOPE! - Tmux is *NOT* running."
+   #Simply creates a new base session named "main" if none exists
+   tmux new-session -d -s ${BASE_SESSION}
+
+   #tmux new-session -d -s ${SESSION}
+fi
+
+#[[ -z "$TMUX" ]] && exec tmux
+# Update the prompt for execute the script
+#source ~/.tmux.conf
+#tmux new-session -s development -n editor -d
+#session_id=$( date +%Y%m%d%H%M%S)
+###############################################################################
+# my TMUX layout
+#x
+# split-window [-dhvP] [-l size | -p percentage] [-t target-pane]
+# [shell-command]
+#      (alias: splitw)
+# Create a new pane by splitting target-pane:
+# -h does a horizontal split and
+# -v a vertical split;
+# if neither is specified, -v is assumed.
+# The -l and -p options specify the size of the new pane
+# in lines (for vertical split) or in cells (for horizontal split),
+# or as a percentage, respectively.  All other options have the
+# same meaning as for the new-window command.
+#
+###############
+
+
+sessionIsAttatched=$(
+  tmux list-sessions -F "#{session_name}: (#{session_id})" | grep -oP '(\w)+(?=:\s\(\$2\))' |
+  grep $SESSION
+  )
+if [ -n "${sessionIsAttatched}" ] ; then
+  tmux switch-client -t $SESSION
+  exit
+fi
+
+
+if tmux has-session -t $SESSION ; then
+  echo "tmux has session $SESSION"
+else
+  echo "tmux has no session  named $SESSION"
+  tmux new-session -d -t ${BASE_SESSION} -s ${SESSION}
+fi
+
+hasWatch=$(
+  tmux list-windows -t $SESSION -F '#W' | grep 'watch'
+  )
+
+if [ -z "${hasWatch}" ] ; then
+  tmux new-window -n watch
+  tmux split-window -t watch
+  tmux select-layout -t watch tiled
+  tmux split-window -t watch
+  tmux select-layout -t watch tiled
+  tmux split-window -t watch
+  tmux select-layout -t watch tiled
+  tmux split-window -t watch
+  tmux select-layout -t watch tiled
+  tmux send-keys -t watch.1 "make livereload-start"  C-m
+  tmux send-keys -t watch.2 "make watch-www"  C-m
+  tmux send-keys -t watch.3 "make watch-templates"  C-m
+  tmux send-keys -t watch.4 "make watch-modules"  C-m
+fi
+
+tmux attach-session -d -t $SESSION
+
+##
+##
+##
+##  if [[ -z "$ID" ]] ;then # if not available create a new one
+##    tmux new-session
+##  else
+##    tmux attach-session -t "$ID" # if available attach to it
+##  fi
+##
+##tmux attach-session -d -t $SESSION
+##
+##tmux split-window -t nginx
+##tmux select-layout -t nginx tiled
+##tmux split-window -t nginx
+##tmux select-layout -t nginx tiled
+##tmux split-window -t nginx
+##tmux select-layout main-vertical
+##
+##tmux new-window -n exist
+##tmux split-window -t exist
+##tmux select-layout -t exist tiled
+##tmux split-window -t exist
+##tmux select-layout -t exist tiled
+##tmux split-window -t exist
+##tmux select-layout main-vertical
+##
+##tmux send-keys -t exist.1 "mxInit && mxExistClient"  C-m
+##tmux send-keys -t exist.1 "cd apps"  C-m
+##tmux send-keys -t exist.1 "cd gmack.nz"  C-m
+##tmux send-keys -t exist.1 "ls"  C-m
+###tmux send-keys -t $SESSION:exist.1 "cd apps"  C-m
+###tmux send-keys -t $SESSION:exist.1 "ls"  C-m
+###tmux send-keys -t $SESSION:exist.1 "cd gmack.nz"  C-m
+##tmux send-keys -t exist.2 "mxInit && mxExistDBLog"  C-m
+##tmux send-keys -t exist.3 "mxInit && mxExistUp"  C-m
+##tmux send-keys -t exist.4 "mxInit && mxAppDataLog"  C-m
+##
+##tmux new-window -n watch
+##tmux split-window -t watch
+##tmux select-layout -t watch tiled
+##tmux split-window -t watch
+##tmux select-layout -t watch tiled
+##tmux split-window -t watch
+##tmux select-layout -t watch tiled
+##tmux split-window -t watch
+##tmux select-layout -t watch tiled
+##
+##tmux send-keys -t watch.1 "make livereload-start"  C-m
+##tmux send-keys -t watch.2 "make watch-templates"  C-m
+##tmux send-keys -t watch.3 "make watch-modules"  C-m
+##tmux send-keys -t watch.4 "make watch-www"  C-m
+##tmux send-keys -t watch.5 "mxInit"  C-m
+##fi
+##
+##tmux select-window -t nginx
+##tmux select-pane -t nginx.1
+##tmux attach -t $SESSION
+
+
+
+

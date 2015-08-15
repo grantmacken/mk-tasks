@@ -1,0 +1,477 @@
+#!/bin/bash +x
+###########################################
+# xq some bash scripts fo working with exist-db
+#
+###########################################
+source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+source "../common.properties"
+source "../project.properties"
+IMPORTS="${HOME}/bin/xq-includes"
+GH_IMPORTS="${HOME}/bin/gh-includes"
+if [ -d ${IMPORTS} ];then
+    for f in "postie" "xq-usage"
+    do
+      if [ -e  ${IMPORTS}/${f}.sh ] ; then
+        #echo "Import $f as source"
+        chmod +x ${IMPORTS}/${f}.sh
+        source ${IMPORTS}/${f}.sh
+      fi
+    done
+    for f in "parse"
+    do
+      if [ -e  ${GH_IMPORTS}/${f}.sh ] ; then
+        #echo "Import $f as source"
+        chmod +x ${GH_IMPORTS}/${f}.sh
+        source ${GH_IMPORTS}/${f}.sh
+      fi
+    done
+
+    #echo "Export functions found in source so they can be used in subscripts"
+    funcNames=$( declare -F | cut -d" " -f3 )
+    for i in ${funcNames}
+    do
+        #echo ${i}
+        export -f ${i}
+    done
+ else
+    echo "ERR!:  link to imports not set up yet"
+	exit 1
+fi
+###################################
+while getopts "h r l" OPTION
+do
+  case $OPTION in
+    h)
+      if xqUsage ; then
+        exit 1
+      fi
+    ;;
+    l)
+      if xqListAvailableQueries ; then
+          exit 1
+      fi 
+    ;;
+    r)
+      HOST="$HOST_REMOTE"
+      shift
+    ;;
+    *)
+  ;;
+  esac
+done  
+
+if [ -z "${HOST}" ] ; then
+  HOST="${HOST_LOCAL}"
+fi
+
+echo "INFO! - *HOST* [ ${HOST} ]"
+
+#echo "INFO! - *GIT_USER_NAME* [ ${GIT_USER} ]"
+#echo "INFO! - *GITHUB_ACCESS_TOKEN* [ ${GITHUB_ACCESS_TOKEN} ]"
+if [ -e ${JSN_REPO} ] ; then
+  parseRepo || exit 1
+fi
+
+if [ -e ${JSN_ASSET_UPLOADED} ] ; then
+  parseAssetUploaded || exit 1
+fi
+
+ARGUMENTS=$#
+QUERY=
+query=
+queryFile=
+# return patterns
+# simple
+# empty, boolean
+returns=
+
+declare -a ARGS
+declare -a params
+
+if [ ! $ARGUMENTS -gt 0 ]; then
+  xqUsage
+  exit 1
+fi
+#echo "INFO! - *ARGUMENTS* [ ${ARGUMENTS} ]'
+QUERY=$1
+echo "#${QUERY}#"
+
+DBA_GROUP='dba'
+
+KNOWN_USER="${GIT_USER}"
+KNOWN_PASS="${GITHUB_ACCESS_TOKEN}"
+
+APP_PATH="apps/${REPO_NAME}"
+#echo "INFO! - *KNOWN_USER* [ ${KNOWN_USER} ]"
+#echo "INFO! - *KNOWN_PASS* [ ${KNOWN_PASS} ]"
+echo "INFO! - *HOST* [ ${HOST} ]"
+echo "INFO! - *QUERY*: [ ${QUERY} ]"
+
+echo "INFO! - *APP_PATH*: [ ${APP_PATH} ]"
+# if we have a extended query or a interpolation heredoc
+# then create the query from the
+if [ $ARGUMENTS -eq 1 ]; then
+  if [ -e "bin/queries/${QUERY}.xq" ] ; then
+	queryFile="bin/queries/${QUERY}.xq"
+	query=$(<${queryFile})
+  fi
+  ARGS=()
+else
+  shift
+  ARGS=("$@")
+  echo "INFO! - *ARGS* [ ${ARGS[@]} ]" 
+  # when we want to interpolate useing a heredoc
+#  if [ -e "$(BIN_DIR)/query/${QUERY}.sh" ] ; then
+#	chmod +x "$(BIN_DIR)/query/${QUERY}.sh"
+#  fi
+fi
+
+
+
+# the list of available queries
+# each query should have
+# params() list of expected args
+# the query, will be either 
+# 	a string, from a file or generated from a here doc
+# returns what gets returned will be either a
+# 	boolean, string, etc
+
+##<status result="ok"/>
+  
+case "$QUERY" in
+#LIST-START#
+  log)
+  params=( )
+  query="(util:log-app('info', 'gmack', 'hi'))"
+  returns='string'
+  ;;
+  put-stored-post)
+  params=( )
+  query=
+  returns='string'
+  ;;
+  get-stored-post)
+  params=()
+  query=
+  returns='string'
+  ;;
+  delete-collection)
+  params=( route )
+  query="(if(\
+  xmldb:collection-available('${1}') ) then (\
+  xmldb:remove('${1}') ) else ())"
+  returns='string'
+  ;;
+  create-collection)
+  params=( route )
+  query="(if(\
+  xmldb:collection-available('${1}') ) then (\
+  ) else (xmldb:create-collection('', '${1}'))
+  )"
+  returns='string'
+  ;;
+  collection-list)
+  params=( route )
+  query="xmldb:get-child-collections('${1}')"
+  returns='list'
+  ;;
+  collection-available)
+  params=( route )
+   query="xmldb:collection-available('${1}')"
+  returns='string'
+  ;;
+  resource-available)
+  params=( route )
+   query="doc-available('${1}')"
+  returns='string'
+  ;;
+  install-and-deploy)
+  params=( )
+  query="repo:install-and-deploy('${REPO_NAME}', '${ASSET_BROWSER_DOWNLOAD_URL}')"
+  returns='repo-status'
+  ;;
+  app-data-collection)
+  params=()
+  query="if( xmldb:collection-available('data/${REPO_NAME}') ) then (\
+   'data/${REPO_NAME}' \
+  ) else (xmldb:create-collection('data', '${REPO_NAME}')) \
+  "
+  returns='string'
+  ;;
+  store-app-data)
+  params=(route)
+  query="xmldb:store-files-from-pattern('data/${REPO_NAME}','${CWD}/data','${1}','application/xml', true())"
+  returns='string'
+  ;;
+  store-app-data-file)
+  params=(path)
+  path=$1
+  collection="data/${REPO_NAME}"
+  directory="${CWD}/data"
+  pattern="$( echo "${path}" | sed 's%^data/%%' )"
+  log="$( echo ${path} | grep -oP '^data/\K(\w)+')"
+  echo "collection: [ $collection ]"
+  echo "directory: [ $directory ]"
+  echo "pattern: [ $pattern ]"
+  echo "log: [ $log ]"
+  query="xmldb:store-files-from-pattern('${collection}','${directory}','${pattern}','application/xml', true())"
+  returns='stored_log'
+  ;;
+  store-app-data-content)
+  params=(path)
+  path=$1
+  resource="$( basename "${path}" )"
+  collection="data/${REPO_NAME}$( dirname "${path}" | sed 's%^data%%' )"
+  contents="$(<${path})"
+  log="$( echo ${path} | grep -oP '^data/\K(\w)+')"
+  echo "path: [ $path ]"
+  echo "collection: [ $collection ]"
+  echo "resource: [ $resource ]"
+  echo "log: [ $log ]"
+  echo "${contents}"
+  query="
+  if( xmldb:collection-available(' $collection') ) then ()\
+  else(xmldb:create-collection('/', '${collection}')),\
+  xmldb:store('${collection}','${resource}',$(<$1))"
+  returns='uploaded_log'
+  ;;
+  store-app-data-files)
+  params=( )
+  echo "INFO! ${CWD}/data"
+  query="xmldb:store-files-from-pattern('data/${REPO_NAME}','${CWD}/data','**/*.xml','application/xml', true() )"
+  returns='list'
+  ;;
+  store-files-from-pattern)
+  params=(route directory pattern mime_type)
+  query="(if(\
+  xmldb:collection-available('apps/${REPO_NAME}/${1}') ) then (\
+  ) else (xmldb:create-collection('apps/${REPO_NAME}', '${1}')),\
+  xmldb:store-files-from-pattern('apps/${REPO_NAME}/${1}','${2}','${3}','${4}')
+  )"
+  returns='string'
+  ;;
+  find-users-by-username)
+  params=(username)
+  query="sm:find-users-by-username('${1}')"
+  returns='string'
+  ;;
+  uuid)
+  params=( )
+  query="util:uuid()"
+  returns='string'
+  ;;
+  create-account)
+  params=(user pass)
+  query="sm:create-account( '${1}', '${2}', 'dba' )"
+  returns='empty'
+  ;;
+  reset-account)
+  params=(user pass)
+  query="sm:create-account( '${1}', '${2}', 'dba' )"
+  returns='empty'
+  ;;
+  is-account-enabled)
+  params=(username)
+  query="sm:is-account-enabled('${1}')"
+  returns='boolean'
+  ;;
+  hello)
+  params=( )
+  #query= predefined xq
+  returns='string'
+  ;;
+  is-dba)
+  params=(username)
+  query="sm:is-dba('${1}')"
+  returns='boolean'
+  ;;
+  repo-list)
+  params=( )
+  query="repo:list()"
+  returns='list'
+  ;;
+  default-pass)
+  params=(admin pass)
+  KNOWN_USER="$1"
+  KNOWN_PASS="$2"
+  query="sm:passwd('${GIT_USER}', '${GITHUB_ACCESS_TOKEN}')"
+  returns='empty'
+  ;;
+  set-password)
+  params=(username password)
+  query="sm:passwd('$1', '$2')"
+  returns='empty'
+  ;;
+#LIST-END# 
+ *)
+   echo "FAILURE! *no  query* named ${QUERY}"
+   xqUsage
+   xqListAvailableQueries
+   exit
+ ;;
+esac
+
+# if the query has not got correct params then exit
+if [[ ${#params[@]} -ne ${#ARGS[@]} ]] ; then
+  if [[ ${#params[@]} -eq 0 ]] ; then
+  echo "FAILURE! ${QUERY} should have ${#params[@]} parameters"
+  else
+   echo "FAILURE! ${QUERY} should have ${#params[@]} parameters"
+   echo "INFO! - *PARAMS ARE* [ "${params[@]}" ]"
+  fi
+  exit 1
+fi
+
+if [ ${QUERY} = 'put-stored-post' ] ; then
+  echo "${QUERY}"
+  lastLine=$( tail -n 1 ${POSTS_STORED_LOG} )
+  localFile=$( echo ${lastLine} | cut -d ' ' -f 1 )
+  remotePath=$( echo ${lastLine} | cut -d ' ' -f 2 )
+  echo ${remotePath}
+  existPUT
+  exit
+fi
+if [ ${QUERY} = 'get-stored-post' ] ; then
+  echo "${QUERY}"
+  lastLine=$( tail -n 1 ${POSTS_STORED_LOG} )
+  localFile=$( echo ${lastLine} | cut -d ' ' -f 1 )
+  remotePath=$( echo ${lastLine} | cut -d ' ' -f 2 )
+  echo ${remotePath}
+  existGET
+  cat ${TEMP_XML}
+  exit
+fi
+
+
+#echo ${query}
+# a call to existQuery will return success or failure
+# if 200 response and TEMP.xml is written to then
+# we can use cheerio (or another parser )
+# to get result and do something with it
+
+if ! existPost ; then
+  #cat TEMP.xml
+  echo "INFO! *not* OK response "
+    case "$returns" in
+	boolean)
+	echo "INFO! - *RESPONSE*: [ false ]"
+	response=$(
+	  echo $(<${TEMP_XML}) |
+	  cheerio message |
+	  grep -oP 'ERROR\s+\K(.+)(?=\[)'
+	  )
+	echo "INFO! - *RESPONSE*: [ ${response} ]"
+	exit 1
+	;;
+	*)
+	response=$(
+	  echo $(<${TEMP_XML}) |
+	  cheerio message |
+	  grep -oP 'ERROR\s+\K(.+)(?=\[)'
+	  )	
+    if [ -n "${response}" ] ; then
+	  echo "INFO! - *RESPONSE*: [ ${response} ]"
+	else
+	  echo "$(<${TEMP_XML})"
+	fi
+	
+	echo "INFO! - *RESPONSE*: [ HTTP ERROR CODE TODO ]"
+	exit 1
+	;;
+  esac
+fi
+
+# a post return file to further procces before returning result
+#if [ -e "$(BIN_DIR)/response/${QUERY}.sh" ] ; then
+#  chmod +x "$(BIN_DIR)/response/${QUERY}.sh"
+#  $(BIN_DIR)/response/${QUERY}.sh
+#fi
+
+case "$returns" in
+  boolean)
+  response=$(
+	echo $(<${TEMP_XML}) |
+	cheerio exist\\:value
+	)
+  echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+  ;;
+  empty)
+  echo "OK! - empty response expected"
+  echo "SUCCESS! - "
+  ;;
+  string)
+  response=$(
+    echo $(<${TEMP_XML}) |
+    cheerio exist\\:value
+    )
+  echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+  ;;
+  stored_log)
+  response=$(
+    echo $(<${TEMP_XML}) |
+    cheerio exist\\:value
+    )
+  echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+  case "$log" in
+    archive)
+    [ ! -e ${POSTS_STORED_LOG} ] && touch ${POSTS_STORED_LOG}
+    [ -n "${response}" ] && echo "${path} ${response}" >> ${POSTS_STORED_LOG}
+    ;;
+    pages)
+    [ ! -e ${PAGES_STORED_LOG} ] && touch ${PAGES_STORED_LOG}
+    [ -n "${response}" ] && echo "${path} ${response}" >> ${PAGES_STORED_LOG}
+    ;;
+  esac
+  ;;
+  uploaded_log)
+  response=$(
+	echo $(<${TEMP_XML}) |
+	cheerio exist\\:value
+	)
+  echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+  case "$log" in
+    archive)
+    [ ! -e ${POSTS_UPLOADED_LOG} ] && touch ${POSTS_UPLOADED_LOG}
+    echo $response >> ${POSTS_UPLOADED_LOG}
+    ;;
+    pages)
+    [ ! -e ${PAGES_UPLOADED_LOG} ] && touch ${PAGES_UPLOADED_LOG}
+    [ -n "${response}" ] && echo "${path} ${response}" >> ${PAGES_UPLOADED_LOG}
+    ;;
+  esac
+  ;;
+  
+  list)
+  response=$(
+	echo $(<${TEMP_XML}) |
+	cheerio exist\\:value
+	)
+  responseList=(${response})
+  listLength=${#responseList[@]}
+  for i in ${!responseList[@]}; do
+    printf "%d) %s\n"  $((i+1))  "${responseList[i]}"
+  done
+  echo "SUCCESS! - *RESPONSE*: [ ${listLength} ] items in ${QUERY} ]"
+  ;;
+  element-status)
+  response=$(
+	echo $(<${TEMP_XML}) |
+	cheerio status
+	)
+  echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+  ;;
+  repo-status)
+  response=$(
+	echo $(<${TEMP_XML}) |
+	cheerio .result
+	)
+  echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+  ;;
+  *)
+  echo "FAILURE! - no return value set"
+  exit 1
+esac
+
+
+exit 0
+
