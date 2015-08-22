@@ -337,32 +337,10 @@ git log \
 readarray COMMITS_SUBJECT < $TEMP_COMMITS_SUBJECTS
 }
 
-
 function parseRepo(){
 [ ! -e "${JSN_REPO}" ] && return 1
-echo "INFO! PARSE REPO"
-#declare
-REPO_URL=
-
-REPO_DESCRIPTION=
-REPO_NAME=
-REPO_FULL_NAME=
-REPO_HOMEPAGE=
-REPO_HTML_URL=
-REPO_BRANCHES_URL=
-REPO_ISSUES_URL=
-REPO_LABELS_URL=
-REPO_MILESTONES_URL=
-REPO_PULLS_URL=
-REPO_RELEASES_URL=
-REPO_TAGS_URL=
-REPO_COMMITS_URL=
-REPO_ISSUE_COMMENT_URL=
-
+#echo "TASK! PARSE REPO"
 jsnFile="$(parseIntoNodeFS ${JSN_REPO})"
-
-echo "${jsnFile}"
-
 nSTR="J = require('${jsnFile}');\
   console.log('REPO_URL=' + J.url);\
   console.log('REPO_NAME=' + J.name);\
@@ -382,24 +360,7 @@ nSTR="J = require('${jsnFile}');\
   console.log('REPO_COMPARE_URL=' +  J.compare_url.split('{')[0]);\
   console.log('REPO_HTML_URL=' +  J.html_url.split('{')[0]);\
 "
-
 source <(node -e "${nSTR}")
-#node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
-
-#echo "INFO! - *REPO_URL*: [ ${REPO_URL} ]"
-#
-#echo "INFO! - *REPO_DESCRIPTION*: [ ${REPO_DESCRIPTION} ]"
-#echo "INFO! - *REPO_FULL_NAME*: [ ${REPO_FULL_NAME} ]"
-#echo "INFO! - *REPO_HOMEPAGE*: [ ${REPO_HOMEPAGE} ]"
-#echo "INFO! - *REPO_NAME*: [ ${REPO_NAME} ]"
-#
-#echo "INFO! - *REPO_BRANCHES_URL*: [ ${REPO_BRANCHES_URL} ]"
-#echo "INFO! - *REPO_ISSUES_URL*: [ ${REPO_ISSUES_URL} ]"
-#echo "INFO! - *REPO_LABELS_URL*: [ ${REPO_LABELS_URL} ]"
-#echo "INFO! - *REPO_MILESTONES_URL*: [ ${REPO_MILESTONES_URL} ]"
-#echo "INFO! - *REPO_PULLS_URL*: [ ${REPO_PULLS_URL} ]"
-#echo "INFO! - *REPO_RELEASES_URL*: [ ${REPO_RELEASES_URL} ]"
-#echo "INFO! - *REPO_TAGS_URL*: [ ${REPO_TAGS_URL} ]"
 }
 
 function parsePullRequest(){

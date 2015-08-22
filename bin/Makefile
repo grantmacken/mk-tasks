@@ -84,6 +84,10 @@ endif
 	@echo XAR $(XAR)
 	@echo TINY-LR_UP $(TINY-LR_UP)
 
+
+tmx:
+	@tmx
+
 #ifneq ($(wildcard $(GH_REPO)),)
 #	@echo 'GH_REPO: $(GH_REPO)'
 #endif
@@ -104,7 +108,7 @@ www: $(STYLES)
 watch-www:
 	@watch -q $(MAKE) www
 
-.PHONY:  watch-www
+.PHONY:  watch-www tmx help
 
 
 test:

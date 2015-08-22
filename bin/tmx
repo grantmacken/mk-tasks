@@ -2,7 +2,7 @@
 source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
 source ../common.properties
 source ../project.properties
-IMPORTS="${USER_BIN}/tmx-includes"
+IMPORTS="${BIN_DIR}/tmx-includes"
 if [ ! -d ${IMPORTS} ] ; then
   echo "FAIL! no imports dir"
   exit

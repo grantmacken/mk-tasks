@@ -3,20 +3,22 @@
 [ ! -e "config" ] &&  exit
 [ ! -e "../common.properties" ] &&  exit
 [ ! -e "../project.properties" ] &&  exit
-[ ! -d "$HOME/bin/gh-includes" ]  &&  exit
+
 
 source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
 if [ -z "$NAME" ] ; then
   exit
 fi
+
 source "../common.properties"
+[ ! -d "${BIN_DIR}/gh-includes" ]  &&  exit
 # setup some common dirs
 [ ! -d "$GITHUB_DIR" ] &&  mkdir -p $GITHUB_DIR/etags $GITHUB_DIR/headers
 [ ! -d "$GITHUB_DIR/issue" ] &&  mkdir -p $GITHUB_DIR/issue
 [ ! -d "$TEMP_DIR" ] &&  mkdir $TEMP_DIR
 [ ! -d "$LOG_DIR" ] &&  mkdir $LOG_DIR
 source "../project.properties"
-imports="$USER_BIN/gh-includes"
+imports="${BIN_DIR}/gh-includes"
 files=(repo usage parse on-branch on-master release-strategy input pull-request)
 if [ -d ${imports} ];then
   for f in "${files[@]}"
