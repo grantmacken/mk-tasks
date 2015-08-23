@@ -9,14 +9,15 @@
 #  'make styles' will now be triggered by changes in dir
 BUILD_DIR ?= build
 STYLE_SRC_DIR := www/assets/styles
-STYLE_INPUT := $(STYLE_SRC_DIR)/input.css
+STYLE_MAIN := $(STYLE_SRC_DIR)/input.css
 STYLE_STYLES := $(shell find $(STYLE_SRC_DIR) -name '*.css')
-STYLE_IMPORTS := $(filter-out $(STYLE_INPUT),$(STYLE_STYLES))
+STYLE_IMPORTS := $(filter-out $(STYLE_MAIN),$(STYLE_STYLES))
 STYLE_OUT_DIR := $(BUILD_DIR)/resources/styles
 OUT_STYLES  :=  $(STYLE_OUT_DIR)/style.css
+ANALYZE-CSS  :=  $(LOG_DIR)/analyze-css.json
 
 #############################################################
-styles: $(OUT_STYLES)
+styles: $(OUT_STYLES) $(ANALYZE-CSS)
 
 analyze-css: $(LOG_DIR)/analyze-css.json
 
@@ -54,6 +55,12 @@ $(OUT_STYLES): $(STYLE_INPUT) $(STYLE_IMPORTS)
  .process(css).css" 2>  /dev/null > $@ && \
  xq store-files-from-pattern '$(patsubst build/%,%,$(dir $@))' '$(dir $(abspath $@))' '$(notdir $@)' 'text/css'  && \
  curl -s --ipv4 http://localhost:35729/changed?files=$(shell node -pe '"$?".split(" ").join(",")')
+
+
+$(LOG_DIR)/analyze-css.json: $(OUT_STYLES)
+	@echo  "analyze-css $@"
+	@echo  "SRC  $< "
+	@analyze-css --pretty --file $< > $@
 
 
 $(LOG_DIR)/prior-analyze-css.json: $(LOG_DIR)/analyze-css.json

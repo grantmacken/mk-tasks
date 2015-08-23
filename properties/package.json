@@ -4,6 +4,7 @@
   "description": "my node modules",
   "private": "true",
   "devDependencies": {
+    "tape": "latest",
     "ramda": "latest",
     "cheerio": "latest",
     "make-livereload": "latest",
@@ -24,7 +25,6 @@
     "analyze-css": "latest",
     "postcss-assets": "latest",
     "cssfmt": "latest",
-    "yslowjs": "latest",
-    "slimmerjs": ""
+    "yslowjs": "latest"
   }
 }

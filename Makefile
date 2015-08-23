@@ -13,6 +13,14 @@ MK_INCLUDES := $(abspath $(wildcard bin/mk-includes/*))
 MK_INC_TARG := $(patsubst $(BASE)/%, $(UP_TARG_DIR)/%, $(MK_INCLUDES))
 
 
+rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
+#
+#BASH_INCLUDES := $(call rwildcard,$(WWW_PAGES_DIR),*.md)
+BASH_SRC := $(abspath $(call rwildcard,$(bin/ext),*.bash)) $(abspath $(wildcard bin/ext/test-more-bash/ext/bashplus/bin/*))
+BASH_TARG := $(patsubst $(BASE)/%, $(UP_TARG_DIR)/%, $(BASH_SRC))
+# $(abspath $(wildcard bin/ext/bashplus/lib/*))  \
+# $(abspath $(wildcard bin/ext/bashplus/lib/*))
+
 XQ_EXEC := $(abspath bin/xq)
 XQ_INCLUDES := $(abspath $(wildcard bin/xq-includes/*))
 
@@ -33,21 +41,33 @@ GH_TARG := $(patsubst $(BASE)/%, $(UP_TARG_DIR)/%, $(GH_EXEC) $(GH_INCLUDES) )
 TMX_TARG := $(patsubst $(BASE)/%, $(UP_TARG_DIR)/%, $(TMX_EXEC) $(TMX_INCLUDES) )
 
 
+
 define ensure-exec
 	@echo 'ensure executable'
 	@chmod +x $(1)
 endef
 
 #
-build: $(MK_INC_TARG) $(PROPERTIES_TARG)  \
-  $(XQ_TARG) $(GH_TARG) $(TMX_TARG) $(WEB_PROJECTS)
+#build: $(MK_INC_TARG) $(PROPERTIES_TARG)  $(NODE_TARG) $(BASH_TARG) \
+#  $(XQ_TARG) $(GH_TARG) $(TMX_TARG) $(WEB_PROJECTS) \
+#  $(UP_TARG_DIR)/bin/ext
+
+build:
+	@mkdir -p $(UP_TARG_DIR)/bin
+	stow -t $(UP_TARG_DIR)/bin bin
+	stow -t $(UP_TARG_DIR) properties
+
 
 clean:
 	@rm $(INC_TARG)
 	@rm $(gmack)
 
 
+
+
+
 $(UP_TARG_DIR)/bin/%: $(BASE)/bin/%
+	@mkdir -p $(dir $@)
 	@echo "MODIFIED: $(@F)"
 	@echo "FROM $<"
 	@echo "COPY TO $@"
@@ -74,7 +94,7 @@ $(UP_TARG_DIR)/%.json: $(BASE)/%.json
 	@echo "TARG_DIR $(UP_TARG_DIR)"
 	@echo "FILE $@ $<"
 	@cp $< $@
-	@cd $(UP_TARG_DIR) && npm install
+	#@cd $(UP_TARG_DIR) && npm install
 
 
 
