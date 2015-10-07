@@ -1,0 +1,25 @@
+{
+  "name": "gmack",
+  "version": "v0.1.0",
+  "description": "my node modules",
+  "private": "true",
+  "devDependencies": {
+    "tape": "latest",
+    "ramda": "latest",
+    "cheerio": "latest",
+    "make-livereload": "latest",
+    "xqlint": "latest",
+    "markdown-it": "latest",
+    "markdown-it-container": "latest",
+    "markdown-it-sanitizer": "latest",
+    "html-frontmatter": "latest",
+    "cssfmt": "latest",
+    "phantomas": "latest",
+    "yslowjs": "latest",
+    "postcss-cli": "latest",
+    "postcss": "latest",
+    "autoprefixer": "latest",
+    "postcss-import": "latest",
+    "postcss-assets": "latest"
+  }
+}
