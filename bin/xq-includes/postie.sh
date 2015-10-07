@@ -111,16 +111,57 @@ then
   else
 	return 1
   fi
+ellse
+  returnll 1
+fi
+}
+
+function  eXistBinPUT(){
+local url=$1
+local file=$2
+local mimeType=$3
+local message=
+echo "TASK! eout file and store xml response"
+local fileName=$( echo "${file}" | sed 's/.*\///')
+local ext=
+if [ -e  ${TEMP_XML} ] ; then
+ rm ${TEMP_XML}
+fi
+return 1
+local doRequest=$(
+curl -s \
+  -X PUT \
+  -H "Content-Type: text/xml" \
+  -u "${KNOWN_USER}:${KNOWN_PASS}" \
+  -o ${TEMP_XML} \
+  -w "%{http_code}" \
+  --data-binary @${localFile} \
+  http://${HOST}:8080/exist/rest${remotePath}
+)
+echo "DONE! status: [ ${doRequest} ]"
+if [[ ${doRequest} = 200  || ${doRequest} = 304 || ${doRequest} = 201  ]]
+then
+  if [ -e ${TEMP_XML} ] ;then
+	return 0
+  else
+	return 1
+  fi
 else
   return 1
 fi
 }
 
-
 function  existPUT(){
+local url=$1
+local file=$2
+local message=
+echo "TASK! put file and store xml response"
+local fileName=$( echo "${file}" | sed 's/.*\///')
+local ext=
 if [ -e  ${TEMP_XML} ] ; then
  rm ${TEMP_XML}
 fi
+return 1
 local doRequest=$(
 curl -s \
   -X PUT \
@@ -146,6 +187,9 @@ fi
 
 
 function existPost(){
+echo 'TASK! POST QUERY'
+# echo ${query}
+# echo ${TEMP_XML}
 local POST=$(   
 cat << EOF
 <query xmlns="http://exist.sourceforge.net/NS/exist" start="1" max="${max}">
@@ -155,7 +199,7 @@ ${query}
 </query>
 EOF
 )
-#echo "$POST"
+# echo "$POST"
 if [ -e  ${TEMP_XML} ] ; then
  rm ${TEMP_XML}
 fi
@@ -169,6 +213,7 @@ curl -s \
   http://${HOST}:8080/exist/rest/db
 )
 echo "DONE! status: [ ${doRequest} ]"
+# echo $(<${TEMP_XML})
 if [[ ${doRequest} = 200  || ${doRequest} = 304 || ${doRequest} = 201  ]]
 then
   if [ -e ${TEMP_XML} ] ;then

@@ -9,13 +9,13 @@
 #  'make styles' will now be triggered by changes in dir
 #  touch www/assets/icons/*
 BUILD_DIR ?= build
-ICONS_SRC_DIR := www/assets/icons
+ICONS_SRC_DIR := www/resources/icons
 ICON_IMPORTS := $(shell find $(ICONS_SRC_DIR) -name '*.svg')
 ICONS_OUT_DIR := $(BUILD_DIR)/resources/icons
 ICONS_MAIN  :=  $(ICONS_OUT_DIR)/icons.svg
 
 #############################################################
-icons: $(ICONS_MAIN) $(XAR)
+icons: $(ICONS_MAIN)
 
 #@watch -q $(MAKE) icons
 watch-icons:

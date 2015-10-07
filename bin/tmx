@@ -36,36 +36,50 @@ else
    echo "INFO! -  project *NOT*  has no remote origin under git control"
 fi
 
-
-BASE_SESSION="${GIT_REPO_OWNER_LOGIN}"
+#BASE_SESSION="${GIT_REPO_OWNER_LOGIN}"
 #session_name="${ABBREV}"
-SESSION="$ABBREV"
-echo "CHECK! - is Tmux running?"
-if $(ps -e | grep -q tmux); then
-  echo "YEP! - Tmux is running."
-  tmux list-sessions
 
- # echo "TASK! - Tmux is running."
- #  Kill defunct sessions first
- # old_sessions=$(tmux list-sessions 2>/dev/null | egrep "^[0-9]{14}.*[0-9]+\)$" | cut -f 1 -d:)
- # for old_session_id in $old_sessions; do
- #   tmux kill-session -t $old_session_id
- # done
- #echo "DONE! - old sessions killed"
+#echo "CHECK! - is Tmux running?"
 
+
+baseSessionExists=$(
+  tmux list-sessions -F "#{session_name}: (#{session_id})" |
+  grep -oP '(\w)+(?=:\s\(\$0\))' |
+  grep $BASE_SESSION
+  )
+
+if [ -z "${baseSessionExists}" ]; then
+  echo "NOPE! - detached baseSession does not Exists"
+  tmux new-session -d -s ${BASE_SESSION}
 else
-   echo "NOPE! - Tmux is *NOT* running."
-   #Simply creates a new base session named "main" if none exists
-   tmux new-session -d -s ${BASE_SESSION}
-
-   #tmux new-session -d -s ${SESSION}
+  echo "YEP! - baseSessionExists"
 fi
 
-#[[ -z "$TMUX" ]] && exec tmux
-# Update the prompt for execute the script
-#source ~/.tmux.conf
-#tmux new-session -s development -n editor -d
-#session_id=$( date +%Y%m%d%H%M%S)
+tmux list-sessions -F "#{session_name}: (#{session_id})"
+
+sessionExists="$(
+  tmux list-sessions -F "#{session_name}: (#{session_id})" | grep -oP '(\w)+(?=:\s\(\$1\))' |
+  grep $SESSION
+  )"
+
+if [ -n "${sessionExists}" ] ; then
+  echo "YEP! - [ $SESSION ] exists"
+  tmux list-sessions -F "#{session_name}: (#{session_id})"
+  if [ -z "$TMUX" ]; then
+    tmx_watch
+    tmux attach  -d -t "$SESSION"
+  else
+    tmux switch-client -t "$SESSION"
+  fi
+  #tmux switch-client -t $SESSION
+else
+  echo "NOPE! - Tmux session [ $SESSION ]  does not exists"
+   tmux new-session -d -t ${BASE_SESSION} -s ${SESSION}
+   tmx_watch
+   tmux attach-session -d -t $SESSION
+fi
+
+
 ###############################################################################
 # my TMUX layout
 #x
@@ -81,47 +95,8 @@ fi
 # or as a percentage, respectively.  All other options have the
 # same meaning as for the new-window command.
 #
-###############
+###############################################################################
 
-
-sessionIsAttatched=$(
-  tmux list-sessions -F "#{session_name}: (#{session_id})" | grep -oP '(\w)+(?=:\s\(\$2\))' |
-  grep $SESSION
-  )
-if [ -n "${sessionIsAttatched}" ] ; then
-  tmux switch-client -t $SESSION
-  exit
-fi
-
-
-if tmux has-session -t $SESSION ; then
-  echo "tmux has session $SESSION"
-else
-  echo "tmux has no session  named $SESSION"
-  tmux new-session -d -t ${BASE_SESSION} -s ${SESSION}
-fi
-
-hasWatch=$(
-  tmux list-windows -t $SESSION -F '#W' | grep 'watch'
-  )
-
-if [ -z "${hasWatch}" ] ; then
-  tmux new-window -n watch
-  tmux split-window -t watch
-  tmux select-layout -t watch tiled
-  tmux split-window -t watch
-  tmux select-layout -t watch tiled
-  tmux split-window -t watch
-  tmux select-layout -t watch tiled
-  tmux split-window -t watch
-  tmux select-layout -t watch tiled
-  tmux send-keys -t watch.1 "make livereload-start"  C-m
-  tmux send-keys -t watch.2 "make watch-www"  C-m
-  tmux send-keys -t watch.3 "make watch-templates"  C-m
-  tmux send-keys -t watch.4 "make watch-modules"  C-m
-fi
-
-tmux attach-session -d -t $SESSION
 
 ##
 ##

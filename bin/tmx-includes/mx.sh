@@ -1,4 +1,26 @@
 #!/bin/bash
+function tmx_watch() {
+echo  'tmx_watch'
+hasWatch=$(
+  tmux list-windows -t $SESSION -F '#W' | grep 'watch'
+  )
+
+if [ -z "${hasWatch}" ] ; then
+  tmux new-window -n watch
+  tmux split-window -t watch
+  tmux select-layout -t watch tiled
+  tmux split-window -t watch
+  tmux select-layout -t watch tiled
+  tmux split-window -t watch
+  tmux select-layout -t watch tiled
+  tmux split-window -t watch
+  tmux select-layout -t watch tiled
+  tmux send-keys -t watch.1 "make livereload-start"  C-m
+  tmux send-keys -t watch.2 "make watch-www"  C-m
+  tmux send-keys -t watch.3 "make watch-templates"  C-m
+  tmux send-keys -t watch.4 "make watch-modules"  C-m
+fi
+}
 
 function mxInit(){
   source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )

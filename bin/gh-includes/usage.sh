@@ -21,7 +21,7 @@ EOF
 }
 
 function ghListAvailableRequests(){
-local file=$(<${USER_BIN}/gh)
+local file=$(<${BIN_DIR}/gh)
 local start=$(
   echo "${file}" |
   sed -n '/#LIST-START#/='
@@ -29,7 +29,7 @@ local start=$(
   
 local pattern="${start},/#LIST-END#/p"
 
-sed -n ${pattern}  ${USER_BIN}/gh |
+sed -n ${pattern}  ${BIN_DIR}/gh |
   sed '1d;$d' |
   grep -zoP '(?s)^\s\s[\w-]+\)$.^\s\sparams=\([a-z ]+\).' |
   sed -r 's/params=\( \)/... no params/g' |

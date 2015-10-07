@@ -3,8 +3,8 @@ include ../common.properties
 SHELL=/bin/bash
 #SHELL += -x
 #SHELL := $(SHELL) -e
-export PATH := $(NODE_BIN_DIR)/:$(PATH)
-export PATH := $(BIN_DIR)/:$(PATH)
+#export PATH := $(abspath $(NODE_BIN_DIR))/:$(PATH)
+#export PATH := $(abspath $(BIN_DIR))/:$(PATH)
 
 #CURRENT_MAKEFILE := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 #MAKEFILE_DIRECTORY := $(dir $(CURRENT_MAKEFILE))
@@ -29,7 +29,7 @@ rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst 
 ifeq ($(TRAVIS_BRANCH),)
  CURRENT_BRANCH := $(shell git symbolic-ref HEAD 2> /dev/null | sed -e 's/refs\/heads\///' )
 else
- CURRENT_BRANCH := 
+ CURRENT_BRANCH :=
 endif
 
 #
@@ -64,6 +64,8 @@ include $(TASKS_DIR)/*.mk
 default: help
 
 help:
+	@echo printenv
+	@echo 'NODE_BIN_DIR ': $(abspath $(NODE_BIN_DIR))
 	@echo 'REPO_SLUG': $(REPO_SLUG)
 	@echo 'OWNER': $(OWNER)
 	@echo 'REPO': $(REPO)
@@ -103,7 +105,7 @@ SCRIPTS := $(JS_SCRIPTS)
 ICONS := $(ICONS_MAIN)
 
 #$(POSTS) $(PAGES)  $(SCRIPTS) $(ICONS)
-www: $(STYLES)
+www: $(STYLES) $(PAGES)
 #
 watch-www:
 	@watch -q $(MAKE) www

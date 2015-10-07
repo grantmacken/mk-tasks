@@ -4,7 +4,6 @@
 [ ! -e "../common.properties" ] &&  exit
 [ ! -e "../project.properties" ] &&  exit
 
-
 source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
 if [ -z "$NAME" ] ; then
   exit

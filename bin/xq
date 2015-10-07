@@ -176,12 +176,35 @@ case "$QUERY" in
   ;;
   collection-available)
   params=( route )
-   query="xmldb:collection-available('${1}')"
+  query="xmldb:collection-available('${1}')"
   returns='string'
   ;;
-  resource-available)
+  xml-resource-available)
   params=( route )
-   query="doc-available('${1}')"
+  query="doc-available('${1}')"
+  returns='string'
+  ;;
+  bin-resource-available)
+  params=( route )
+  query="util:binary-doc-available('${1}')"
+  returns='string'
+  ;;
+  app-collection-available)
+  params=( path )
+  route=${APP_PATH}/${1}
+  query="xmldb:collection-available('${route}')"
+  returns='string'
+  ;;
+  app-xml-resource-available)
+  params=( path )
+  route=${APP_PATH}/${1}
+  query="doc-available('${route}')"
+  returns='string'
+  ;;
+  app-bin-resource-available)
+  params=( path )
+  route=${APP_PATH}/${1}
+  query="util:binary-doc-available('${route}')"
   returns='string'
   ;;
   install-and-deploy)
@@ -274,10 +297,18 @@ case "$QUERY" in
   query="sm:is-account-enabled('${1}')"
   returns='boolean'
   ;;
-  hello)
-  params=( )
-  #query= predefined xq
+  media-update)
+  params=( path )
+  path=build/$1
+  route=${APP_PATH}/${1}
+  query="util:binary-doc-available('${route}')"
+  resource="$( basename "${path}" )"
+  collection="${APP_PATH}$( dirname "${path}" | sed 's%^build%%' )"
+  echo ${route}
+  echo ${resource}
+  echo ${collection}
   returns='string'
+  exit
   ;;
   is-dba)
   params=(username)
@@ -349,7 +380,6 @@ fi
 # to get result and do something with it
 
 if ! existPost ; then
-  #cat TEMP.xml
   echo "INFO! *not* OK response "
     case "$returns" in
 	boolean)
