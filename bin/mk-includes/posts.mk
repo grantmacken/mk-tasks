@@ -2,7 +2,7 @@
 #  POSTS MARKDOWN TO DATA
 # pages can
 #==========================================================
-WWW_POSTS_DIR := www/posts
+WWW_POSTS_DIR := content/posts
 TEMP_POSTS_DIR := $(TEMP_DIR)/md/posts
 DATA_POSTS_DIR := $(DATA_DIR)/archive
 
@@ -10,20 +10,12 @@ DATA_ARCHIVE_DIR := $(DATA_DIR)/archive
 
 #MARKDOWN
 SRC_POSTS := $(shell find $(WWW_POSTS_DIR) -name '*.md'  )
-OUT_TEMP_POSTS := $(patsubst $(WWW_POSTS_DIR)/%, $(TEMP_POSTS_DIR)/%, $(SRC_PAGES))
-
+OUT_TEMP_POSTS := $(patsubst $(WWW_POSTS_DIR)/%, $(TEMP_POSTS_DIR)/%, $(SRC_POSTS))
 OUT_TEMP_ARTICLES := $(patsubst $(WWW_POSTS_DIR)/articles/%, $(TEMP_POSTS_DIR)/articles/%, $(SRC_POSTS))
-
 OUT_DATA_POSTS := $(foreach src,$(SRC_POSTS), $(addprefix $(DATA_POSTS_DIR)/,$(subst -,/,$(shell echo $(notdir $(src) ) | grep -oP '\d{4}-\d{2}-\d{2}')))/$(shell echo $(notdir $(src)) | grep -oP '\d{4}-\d{2}-\d{2}-\K[a-z-]+').xml )
 
-POSTX := $(patsubst $(DATA_ARCHIVE_DIR)/%.xml,$(BUILD_DIR)/$(DATA_POSTS_DIR)/%.xml , $(shell find $(DATA_ARCHIVE_DIR) -name '*.xml'  ))
+# POSTX := $(patsubst $(DATA_ARCHIVE_DIR)/%.xml,$(BUILD_DIR)/$(DATA_POSTS_DIR)/%.xml , $(shell find $(DATA_ARCHIVE_DIR) -name '*.xml'  ))
 
-#############################################################
-
-watch-posts:
-	@watch  -q $(MAKE) posts
-
-.PHONY: watch-posts
 ############################################################
 # functions
 STORED_POST != tail -n 1 $(POSTS_STORED_LOG)
@@ -35,13 +27,39 @@ parse_date = $(shell echo "$1" | grep -oP '\d{4}-\d{2}-\d{2}')
 parse_post_type = $(shell echo "$1" | grep -oP 'article')
 tag_uri = tag:$(NAME),$(call parse_date,$1):article:$(call parse_name,$1)
 archive_url = http://$(NAME)/archive/$(call url_dir,$1)/$(call parse_name,$1).html
-archive_file = $(DATA_POSTS_DIR)/$(subst -,/,$(call parse_date,$1))/$(call parse_name,$1).xml
+archive_file = $(DATA_POSTS_DIR)/$(call url_dir,$1)/$(call parse_name,$1).xml
 
+LOGGED_TRIGGER != tail -n 1 $(LOG_DIR)/trigger.log
 ############################################################
 #
-OUT_POSTS :=  $(OUT_TEMP_ARTICLES) $(POSTS_STORED_LOG)
+OUT_POSTS :=  $(OUT_TEMP_ARTICLES)  $(POSTS_STORED_LOG) 
+
+# $(POSTS_STORED_LOG)
 
 posts: $(OUT_POSTS)
+
+watch-posts:
+	@watch $(MAKE) posts
+
+.PHONY: watch-posts posts-help
+
+posts-help:
+	@echo SRC_POSTS $(SRC_POSTS)
+	@echo '---------------------------------------------------------------------'
+	@echo POSTS_STORED_LOG: $(POSTS_STORED_LOG)
+	@echo "file: $(word 1, $(call STORED_POST))"   
+	@echo "eXist:  $(word 2, $(call STORED_POST))"   
+	@echo '---------------------------------------------------------------------'
+	@echo eXist log $(notdir $(XMLDB_LOG) )
+	@echo eXist last item stored $(STORED)
+	@echo '---------------------------------------------------------------------'
+	@echo eXist app log $(LOG_DIR)/trigger.log 
+	@echo eXist last logged trigger
+	@tail -n 1 $(LOG_DIR)/trigger.log
+# @echo eXist app log last item $(call LOGGED_APP)
+
+# whenever an article is changed in the content/posts/articles dir
+# 
 
 $(TEMP_POSTS_DIR)/articles/%: $(WWW_POSTS_DIR)/articles/%
 	@echo "MD to XML DATA"
@@ -50,6 +68,13 @@ $(TEMP_POSTS_DIR)/articles/%: $(WWW_POSTS_DIR)/articles/%
 	@echo "md out: [ $(@) ]"
 	@echo "mkdir: [ $(@D) ]"
 	@mkdir -p $(@D)
+	@echo $(notdir $<)
+	@echo parse date: $(call parse_date,$<)
+	@echo parse name: $(call parse_name,$<)
+	@echo date url dir: $(call url_dir,$<)
+	@echo parse post type: $(call parse_post_type,$<)
+	@echo tag-uri: $(call tag_uri,$<)
+	@echo $(notdir $<)
 	@echo "mkdir: [ $(dir $(call archive_file,$<)) ]"
 	@mkdir -p $(dir $(call archive_file,$<))
 	@echo  "xml-out:  [ $(call archive_file,$<) ]"
@@ -86,10 +111,12 @@ $(TEMP_POSTS_DIR)/articles/%: $(WWW_POSTS_DIR)/articles/%
  if(R.prop('syndication', fm)){n('syndication').text(R.prop('syndication', fm))}else{n('syndication').remove()};\
  if(R.prop('in-reply-to', fm)){n('in-reply-to').text(R.prop('in-reply-to', fm))}else{n('in-reply-to').remove()};\
  n.xml()" > $(call archive_file,$<)
+	@echo '--------------------------------------------------------------------'
 	@node -pe "\
  fs = require('fs');\
  n = require('cheerio').load(fs.readFileSync('$(call archive_file,$<)'));\
  n.xml();"
+	@echo '--------------------------------------------------------------------'
  
 ############################################################
 

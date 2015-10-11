@@ -1,4 +1,5 @@
 #!/bin/bash
+
 function tmx_watch() {
 echo  'tmx_watch'
 hasWatch=$(

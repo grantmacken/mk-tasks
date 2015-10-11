@@ -54,8 +54,6 @@ REPO := $(shell echo  "$(REPO_SLUG)" |cut -d/ -f2)
 API_REPO := $(REPO_BASE_URL)/repos/$(REPO_SLUG)
 #derived vars
 WEBSITE := http://$(REPO)
-
-
 CURRENT_DATE  != date "+%Y-%m-%d"
 CURRENT_DATE_TIME != date "+%Y-%m-%dT%H:%M:%S"
 

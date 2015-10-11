@@ -22,8 +22,12 @@ issue: $(JSN_ISSUE)
 watch-issue:
 	@watch -q $(MAKE) issue
 
-.PHONY:  watch-issue
+.PHONY:  watch-issue issue-help
 #############################################################
+
+issue-help:
+	@echo  "CURRENT_BRANCH:  $(CURRENT_BRANCH)"
+	@echo "PARSED_ISSUE_NUMBER: $(PARSED_ISSUE_NUMBER)"
 
 $(JSN_ISSUE): $(ISSUE_FILE)
 ifneq ($(CURRENT_BRANCH),master)
@@ -35,6 +39,8 @@ ifneq ($(CURRENT_BRANCH),master)
 	@gh commit-issue-task
 	@gh get-$(basename $(notdir $@)) $(PARSED_ISSUE_NUMBER)
 endif
+
+
 
 
 #$(JSN_PULLS): $(JSN_ISSUE)

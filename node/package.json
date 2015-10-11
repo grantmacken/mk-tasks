@@ -5,8 +5,9 @@
   "private": "true",
   "devDependencies": {
     "tape": "latest",
-    "ramda": "latest",
     "cheerio": "latest",
+    "ramda": "latest",
+    "ramda-cli": "latest",
     "make-livereload": "latest",
     "xqlint": "latest",
     "markdown-it": "latest",

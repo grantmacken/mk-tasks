@@ -392,7 +392,7 @@ case "$REQUEST" in
   ;;
   sync-issue)
   params=( )
-  branchSyncIssue
+  branchSyncIssue 
   exit
   ;;
   commit-issue-task)
@@ -447,11 +447,11 @@ EOF
   params=( )
   echo "$(<${JSN_ISSUE_COMMENTS})" | R  'project [\id \body]'  -o table
   ;;
-  semver)
-  params=( )
-  branchNewBuildSemver
-  exit
-  ;;
+  # semver)
+  # params=( )
+  # branchNewBuildSemver
+  # exit
+  # ;;
   parse-issue-md)
   params=( )
   parseIssueMD
