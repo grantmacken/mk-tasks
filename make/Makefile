@@ -18,7 +18,14 @@ ifneq ($(wildcard $(PID_TINY_LR)),)
   TINY-LR_UP :=  $(shell ps "$$(<$(PID_TINY_LR))" | awk '/tiny-lr/{print $$1,$$5}')
 else
   TINY-LR_UP :=
-endif
+endif           
+
+ifneq ($(wildcard $(SEMVER_FILE)),)
+ VERSION := $(shell cat $(SEMVER_FILE))
+else
+ $(file > $(SEMVER_FILE),v0.0.0)
+ VERSION := $(shell cat $(SEMVER_FILE))
+endif           
 
 STORED != tail -n 1 $(XMLDB_LOG) | grep -oP 'storing document \K(.+)'
 
@@ -39,7 +46,6 @@ ifneq ($(CURRENT_BRANCH),master)
  PARSED_ISSUE_TITLE := $(shell echo $(CURRENT_BRANCH) |grep -oP '[a-z]{1,10}+-[0-9]{1,4}-\K(.+)' | tr '-' ' ')
 endif
 #
-VERSION := $(shell cat $(SEMVER_FILE))
 SRC_BUILD := $(wildcard $(BUILD_DIR)/* )
 XAR := $(PKG_DIR)/xar/$(ABBREV)-$(VERSION).xar
 
