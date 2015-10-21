@@ -3,9 +3,9 @@
 #==========================================================
 SRC_TEMPLATES := $(shell find templates -name '*.html')
 TEMPLATES_BUILD_DIR := $(BUILD_DIR)/templates
-HTML_TEMPLATES := $(patsubst templates/%, $(TEMPLATES_BUILD_DIR)/%, $(SRC_TEMPLATES))
+BUILD_HTML_TEMPLATES := $(patsubst templates/%, $(TEMPLATES_BUILD_DIR)/%, $(SRC_TEMPLATES))
 #############################################################
-templates: $(HTML_TEMPLATES)
+templates: $(BUILD_HTML_TEMPLATES)
 
 #for testing  use: make watch-templates
 watch-templates:

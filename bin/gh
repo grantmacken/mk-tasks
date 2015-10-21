@@ -85,7 +85,7 @@ fi
 
 #echo "INFO! - *ARGUMENTS* [ ${ARGUMENTS} ]"
 REQUEST=$1
-echo "#${REQUEST}#"
+# echo "#${REQUEST}#"
 #echo "INFO! - *GIT_USER_NAME* [ ${GIT_USER} ]"
 #echo "INFO! - *GITHUB_ACCESS_TOKEN* [ ${GITHUB_ACCESS_TOKEN} ]"
 #echo "INFO! - *PROJECT_NAME* [ ${PROJECT_NAME} ]"
@@ -132,7 +132,7 @@ fi
 [ -n "${GIT_REPO_FULL_NAME}" ]  || exit 1
 API_REPO="${REPO_BASE_URL}/repos/${GIT_REPO_FULL_NAME}"
 DO="$(echo "$REQUEST" | sed -r 's/-(.+)//g' )"
-echo "TASK! *DO* : [ $DO ]"
+# echo "TASK! *DO* : [ $DO ]"
 #COLLECTION_NAME=
 #GET_COLLECTION=
 #if [ "$DO" = 'create' ] || [ "$DO" = 'delete' ] ; then
@@ -172,6 +172,11 @@ case "$REQUEST" in
   requestURL="${REPO_BRANCHES_URL}"
   outFile="${JSN_BRANCHES}"
   ;;
+  list-branches)
+  params=( )
+  echo "$(<${JSN_BRANCHES})" | R  'project [\name]'  -o table
+  exit
+	;;
   info-branch)
   branchInfo || exit
   exit
@@ -405,8 +410,8 @@ case "$REQUEST" in
   parseFetchedIssue
   exit
   ;;
-  parse-issue_md)
-  params=( )
+  parse-issue-md)
+  params=( ) s
   parseIssueMD
   exit
   ;;
@@ -452,11 +457,6 @@ EOF
   # branchNewBuildSemver
   # exit
   # ;;
-  parse-issue-md)
-  params=( )
-  parseIssueMD
-  exit
-  ;;
 # PULLS
   get-pulls)
   params=( )
@@ -512,6 +512,7 @@ EOF
 # MERGING A PULL-REQUEST
   ;;
   info-pr-merge-state)
+  params=( )
   gh 'get-current-pull-request' || exit
   gh 'get-pr-combined-status' || exit
   parsePullRequest > /dev/null
@@ -522,6 +523,12 @@ EOF
   echo "INFO! - *PR_COMBINED_STATUS_STATE*: [ ${PR_COMBINED_STATUS_STATE} ]"
   exit
   ;;
+	echo-pr-merged)
+  params=( )
+	parsePullRequest > /dev/null
+  echo "${PR_MERGED}" 
+	exit
+	;;
   merge-pull-request)
   params=( )
   gh 'get-current-pull-request' || exit
@@ -773,8 +780,10 @@ EOF
   params=( )
   parseTags > /dev/null
   parseIssueMD > /dev/null
+  parseFetchedIssue > /dev/null
   parseLatestRelease > /dev/null
   omPriorReleaseConditions
+	exit
   omUpdateSemver
   make build
   #omCreateAnnotatedTag
@@ -797,7 +806,7 @@ EOF
   method='POST'
   requestURL="${REPO_RELEASES_URL}"
   outFile="${JSN_RELEASE}"
-  jsn="{\"tag_name\":\"${1}\",\"target_commitish\":\"master\",\"name\":\"${2}\",\"body\":\"${3}\",\"draft\":\"false\",\"prerelease\":\"false\"}"
+  jsn="{\"tag_name\":\"${1}\",\"target_commitish\":\"master\",\"name\":\"${2}\",\"body\":\"${3}\",\"draft\":false,\"prerelease\":false}"
   echo "${jsn}" | R -p 'id'
   expectResponse=201
   ;;
@@ -816,15 +825,14 @@ EOF
   ;;
 #RELEASE ASSETS
   create-release-asset)
-  params=( )
-  parseLatestRelease > /dev/null
+  params=( upload_url name )
   method='UPLOAD'
-  requestURL="${RELEASE_UPLOAD_URL}${RELEASE_NAME}"
+  requestURL="${1}?name=${2}.xar"
   outFile="${JSN_ASSET_UPLOADED}"
   contentType='application/zip'
-  upFile="pkg/xar/${RELEASE_NAME}.xar"
+  upFile="pkg/xar/${2}.xar"
   expectResponse=201
-  echo "INFO! *RELEASE_ASSET* [ ${upFile} ] "
+  # echo "INFO! *RELEASE_ASSET* [ ${upFile} ] "
   ;;
   parse-asset-uploaded)
   parseAssetUploaded

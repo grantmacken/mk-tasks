@@ -20,13 +20,11 @@ else
   TINY-LR_UP :=
 endif           
 
-ifneq ($(wildcard $(SEMVER_FILE)),)
- VERSION := $(shell cat $(SEMVER_FILE))
-else
+ifeq ($(wildcard $(SEMVER_FILE)),)
  $(file > $(SEMVER_FILE),v0.0.0)
- VERSION := $(shell cat $(SEMVER_FILE))
 endif           
 
+VERSION != echo "$$(<$(SEMVER_FILE))"
 STORED != tail -n 1 $(XMLDB_LOG) | grep -oP 'storing document \K(.+)'
 
 #recurcive wildcard function
@@ -113,6 +111,11 @@ www: $(STYLES) $(PAGES)
 #
 watch-www:
 	@watch -q $(MAKE) www
+
+all: $(BUILD_XQUERY_MODULES) $(BUILD_HTML_TEMPLATES) 
+
+watch-all:
+	@watch -q $(MAKE) 
 
 .PHONY:  watch-www tmx help
 

@@ -130,12 +130,11 @@ fi
 nSTR="J = require('${GITHUB_ISSUES}');\
  R = require('ramda');\
  print = function(x){ ;\
- title = R.prop('title',x);\
- strTitle =  R.replace(' ','-', title);\
+ title = R.prop('title',x).replace(/\\s/g,'-');\
  number = R.prop('number',x);\
  label = R.prop('labels',x)[0].name
  appended = R.append(\
- [label, number, strTitle], \
+ [label, number, title], \
  []);\
  flattened = R.flatten(appended);\
  joined = R.join('-', flattened);;\
@@ -163,20 +162,14 @@ if [ ! -e "${JSN_ISSUE}" ] ; then
   echo "FAILURE: file required ${JSN_ISSUE}"
   return 1
 fi
-
 local jsnFile="$(parseIntoNodeFS ${JSN_ISSUE})"
 local nSTR=
-
 ISSUE_PULLS_URL=
 if [ -z "$(node -pe "require('${jsnFile}')['pull_request']" | grep -oP 'undefined')" ]
  then
  ISSUE_PULLS_URL="$(node -pe "require('${jsnFile}')['pull_request']['url']")"
 fi
-
-
-echo "$(<${JSN_ISSUE})" | jq '.'
-
-
+# echo "$(<${JSN_ISSUE})" | jq '.'
 nSTR="J = require('${jsnFile}');\
  R = require('ramda');\
  j = R.pick([\
@@ -202,27 +195,25 @@ nSTR="J = require('${jsnFile}');\
  milestone_number, label , state, updated_at, comments,
  body ]);\
 "
-node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
+# node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
 source <(node -e "${nSTR}")
 # TODO! double check parsed branch-name with ... below
-echo "INFO! - *FETCHED_URL*: [ ${FETCHED_URL} ]"
-echo "INFO! - *FETCHED_EVENTS_URL* : [ ${FETCHED_EVENTS_URL} ]"
-echo "INFO! - *FETCHED_COMMENTS_URL* : [ ${FETCHED_COMMENTS_URL} ]"
-echo "INFO! - *FETCHED_ISSUE_UPDATED_AT*: [ ${FETCHED_ISSUE_UPDATED_AT} ]"
-echo "INFO! - *FETCHED_ISSUE_LABEL*: [ ${FETCHED_ISSUE_LABEL} ]"
-echo "INFO! - *FETCHED_ISSUE_NUMBER*: [ ${FETCHED_ISSUE_NUMBER} ]"
-echo "INFO! - *FETCHED_ISSUE_TITLE*: [ ${FETCHED_ISSUE_TITLE} ]"
-echo "INFO! - *FETCHED_ISSUE_MILESTONE_TITLE*: [ ${FETCHED_ISSUE_MILESTONE_TITLE} ]"
-echo "INFO! - *FETCHED_ISSUE_MILESTONE_NUMBER*: [ ${FETCHED_ISSUE_MILESTONE_NUMBER} ]"
-echo "INFO! - *FETCHED_ISSUE_STATE*: [ ${FETCHED_ISSUE_STATE} ]"
-echo "INFO! - *FETCHED_ISSUE_COMMENTS*: [ ${FETCHED_ISSUE_COMMENTS} ]"
-echo "INFO! - *FETCHED_ISSUE_BODY* ... "
-echo "INFO! - *ISSUE_PULLS_URL* : [ ${ISSUE_PULLS_URL} ]"
-
-
-local fileTitle="$( echo "${FETCHED_ISSUE_TITLE}" | tr ' ' '-')"
-local toFile="${GITHUB_DIR}/issue/${FETCHED_ISSUE_LABEL}-${FETCHED_ISSUE_NUMBER}-${fileTitle}.json"
-cp ${JSN_ISSUE} ${toFile}
+# echo "INFO! - *FETCHED_URL*: [ ${FETCHED_URL} ]"
+# echo "INFO! - *FETCHED_EVENTS_URL* : [ ${FETCHED_EVENTS_URL} ]"
+# echo "INFO! - *FETCHED_COMMENTS_URL* : [ ${FETCHED_COMMENTS_URL} ]"
+# echo "INFO! - *FETCHED_ISSUE_UPDATED_AT*: [ ${FETCHED_ISSUE_UPDATED_AT} ]"
+# echo "INFO! - *FETCHED_ISSUE_LABEL*: [ ${FETCHED_ISSUE_LABEL} ]"
+# echo "INFO! - *FETCHED_ISSUE_NUMBER*: [ ${FETCHED_ISSUE_NUMBER} ]"
+# echo "INFO! - *FETCHED_ISSUE_TITLE*: [ ${FETCHED_ISSUE_TITLE} ]"
+# echo "INFO! - *FETCHED_ISSUE_MILESTONE_TITLE*: [ ${FETCHED_ISSUE_MILESTONE_TITLE} ]"
+# echo "INFO! - *FETCHED_ISSUE_MILESTONE_NUMBER*: [ ${FETCHED_ISSUE_MILESTONE_NUMBER} ]"
+# echo "INFO! - *FETCHED_ISSUE_STATE*: [ ${FETCHED_ISSUE_STATE} ]"
+# echo "INFO! - *FETCHED_ISSUE_COMMENTS*: [ ${FETCHED_ISSUE_COMMENTS} ]"
+# echo "INFO! - *FETCHED_ISSUE_BODY* ... "
+# echo "INFO! - *ISSUE_PULLS_URL* : [ ${ISSUE_PULLS_URL} ]"
+# local fileTitle="$( echo "${FETCHED_ISSUE_TITLE}" | tr ' ' '-')"
+# local toFile="${GITHUB_DIR}/issue/${FETCHED_ISSUE_LABEL}-${FETCHED_ISSUE_NUMBER}-${fileTitle}.json"
+# cp ${JSN_ISSUE} ${toFile}
 }
 
 
@@ -365,25 +356,6 @@ source <(node -e "${nSTR}")
 
 function parsePullRequest(){
 [ ! -e "${JSN_PULL_REQUEST}" ] && return 1
-#declare
-
-PR_HEAD_SHA=
-PR_BASE_SHA=
-PR_HEAD_REF=
-PR_BASE_REF=
-PR_MERGED=
-PR_MERGEABLE=
-PR_MERGEABLE_STATE=
-PR_REVIEW_COMMENTS=
-PR_COMMENTS=
-PR_COMMITS=
-PR_HTML_URL=
-
-#"commits_url"
-#"review_comments_url
-#"comments_url"
-#"statuses_url"
-
 nSTR="J = require('$( parseIntoNodeFS ${GITHUB_PULL_REQUEST} )');\
  R = require('ramda');\
  j = R.pick([\
@@ -435,39 +407,39 @@ nSTR="J = require('$( parseIntoNodeFS ${GITHUB_PULL_REQUEST} )');\
  ]);\
 "
 # debug with below
-#node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
+# node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
 source <(node -e "${nSTR}")
 # same as issue
-echo "INFO! - *PR_UPDATED_AT*: [ ${PR_UPDATED_AT} ]"
-echo "INFO! - *PR_NUMBER*: [ ${PR_NUMBER} ]"
-echo "INFO! - *PR_TITLE*: [ ${PR_TITLE} ]"
-echo "INFO! - *PR_MILESTONE_TITLE*: [ ${PR_MILESTONE_TITLE} ]"
-echo "INFO! - *PR_MILESTONE_NUMBER*: [ ${PR_MILESTONE_NUMBER} ]"
-echo "INFO! - *PR_STATE*: [ ${PR_STATE} ]"
-echo "INFO! - *PR_COMMENTS*: [ ${PR_COMMENTS} ]"
-echo "INFO! - *PR_BODY* ... "
-# merge state
-echo ''
-echo "INFO! - *PR_COMMITS*: [ ${PR_COMMITS} ]"
-echo "INFO! - *PR_MERGED*: [ ${PR_MERGED} ]"
-echo "INFO! - *PR_MERGEABLE*: [ ${PR_MERGEABLE} ]"
-echo "INFO! - *PR_MERGEABLE_STATE*: [ ${PR_MERGEABLE_STATE} ]"
-echo "INFO! - *PR_REVIEW_COMMENTS*: [ ${PR_REVIEW_COMMENTS} ]"
-echo "INFO! - *PR_COMMENTS*: [ ${PR_COMMENTS} ]"
-echo ''
-# URLs
-echo "INFO! - *PR_URL*: [ ${PR_URL} ]"
-echo "INFO! - *PR_COMMENTS_URL*: [ ${PR_COMMENTS_URL} ]"
-echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
-echo "INFO! - *PR_REVIEW_COMMENTS_URL*: [ ${PR_REVIEW_COMMENTS_URL} ]"
-echo "INFO! - *PR_COMMITS_URL*: [ ${PR_COMMITS_URL} ]"
-echo "INFO! - *PR_HTML_URL*: [ ${PR_HTML_URL} ]"
+# echo "INFO! - *PR_UPDATED_AT*: [ ${PR_UPDATED_AT} ]"
+# echo "INFO! - *PR_NUMBER*: [ ${PR_NUMBER} ]"
+# echo "INFO! - *PR_TITLE*: [ ${PR_TITLE} ]"
+# echo "INFO! - *PR_MILESTONE_TITLE*: [ ${PR_MILESTONE_TITLE} ]"
+# echo "INFO! - *PR_MILESTONE_NUMBER*: [ ${PR_MILESTONE_NUMBER} ]"
+# echo "INFO! - *PR_STATE*: [ ${PR_STATE} ]"
+# echo "INFO! - *PR_COMMENTS*: [ ${PR_COMMENTS} ]"
+# echo "INFO! - *PR_BODY* ... "
+# # merge state
+# echo ''
+# echo "INFO! - *PR_COMMITS*: [ ${PR_COMMITS} ]"
+# echo "INFO! - *PR_MERGED*: [ ${PR_MERGED} ]"
+# echo "INFO! - *PR_MERGEABLE*: [ ${PR_MERGEABLE} ]"
+# echo "INFO! - *PR_MERGEABLE_STATE*: [ ${PR_MERGEABLE_STATE} ]"
+# echo "INFO! - *PR_REVIEW_COMMENTS*: [ ${PR_REVIEW_COMMENTS} ]"
+# echo "INFO! - *PR_COMMENTS*: [ ${PR_COMMENTS} ]"
+# echo ''
+# # URLs
+# echo "INFO! - *PR_URL*: [ ${PR_URL} ]"
+# echo "INFO! - *PR_COMMENTS_URL*: [ ${PR_COMMENTS_URL} ]"
+# echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
+# echo "INFO! - *PR_REVIEW_COMMENTS_URL*: [ ${PR_REVIEW_COMMENTS_URL} ]"
+# echo "INFO! - *PR_COMMITS_URL*: [ ${PR_COMMITS_URL} ]"
+# echo "INFO! - *PR_HTML_URL*: [ ${PR_HTML_URL} ]"
 #echoLine
-echo "${PR_BODY}"
-echo "INFO! - *PR_HEAD_SHA*: [ ${PR_HEAD_SHA} ]"
-echo "INFO! - *PR_BASE_SHA*: [ ${PR_BASE_SHA} ]"
-echo "INFO! - *PR_HEAD_REF*: [ ${PR_HEAD_REF} ]"
-echo "INFO! - *PR_BASE_REF*: [ ${PR_BASE_REF} ]"
+# echo "${PR_BODY}"
+# echo "INFO! - *PR_HEAD_SHA*: [ ${PR_HEAD_SHA} ]"
+# echo "INFO! - *PR_BASE_SHA*: [ ${PR_BASE_SHA} ]"
+# echo "INFO! - *PR_HEAD_REF*: [ ${PR_HEAD_REF} ]"
+# echo "INFO! - *PR_BASE_REF*: [ ${PR_BASE_REF} ]"
 }
 
 

@@ -528,7 +528,7 @@ EOF
       echo "TASK! checkout master" 
       doTask=$( git checkout ${PR_BASE_REF} )
       echo "DONE! checked out master ${doTask}"
-      source "${USER_BIN}/project.properties"
+      source "${BIN_DIR}/project.properties"
       echo "INFO! - CURRENT_BRANCH [ ${CURRENT_BRANCH} ]"
       if [ ${CURRENT_BRANCH} = 'master' ] ; then
         echo "TASK! working directory up to date with origin" 
@@ -679,7 +679,7 @@ fi
 echo "TASK! checkout master"
 doTask=$( git checkout ${PR_BASE_REF} )
 echo "DONE! checked out master ${doTask}"
-source "${USER_BIN}/project.properties"
+source "${BIN_DIR}/project.properties"
 echo "INFO! - CURRENT_BRANCH [ ${CURRENT_BRANCH} ]"
 if [ ${CURRENT_BRANCH} = 'master' ] ; then
   echo "TASK! working directory up to date with origin"

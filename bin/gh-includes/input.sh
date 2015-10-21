@@ -5,8 +5,7 @@ function inputSelectIssueForBranch(){
   options=()
   for i in "${!ISSUES_FOR_BRANCHES[@]}"
       do
-         item=$( echo "${ISSUES_FOR_BRANCHES[i]}" )
-         options+=("${item}")
+         options+=(${ISSUES_FOR_BRANCHES[i]})
       done
   echo "INPUT! Select issue for branch"
   utilitySelectOption 'BRANCH_SELECTED' || return 1

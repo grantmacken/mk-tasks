@@ -3,9 +3,9 @@
 #==========================================================
 SRC_MODULES := $(shell find modules -name '*.xq*' )
 MODULES_BUILD_DIR := $(BUILD_DIR)/modules
-XQUERY_MODULES := $(patsubst modules/%, $(MODULES_BUILD_DIR)/%, $(SRC_MODULES))
+BUILD_XQUERY_MODULES := $(patsubst modules/%, $(MODULES_BUILD_DIR)/%, $(SRC_MODULES))
 #############################################################
-modules: $(XQUERY_MODULES)
+modules: $(BUILD_XQUERY_MODULES)
 
 #for testing  use: make watch-modules
 watch-modules:

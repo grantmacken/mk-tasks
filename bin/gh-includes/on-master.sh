@@ -600,12 +600,23 @@ echo "DONE! ${doTask}"
 
 
 omUpdateSemver(){
-
-if [ -e ${SEMVER_FILE} ] ; then
-  echo "INFO! SEMVER ${SEMVER_FILE}"
-  SEMVER=$(<${SEMVER_FILE})
-fi
-
+[ -e ${SEMVER_FILE} ]  && SEMVER=$(<${SEMVER_FILE}) 
+# depends on
+[ -z "${LATEST_TAG}" ] &&  parseTags  > /dev/null
+[ -z "${PR_MILESTONE_TITLE}" ] && parsePullRequest 
+[ -z "${FETCHED_ISSUE_MILESTONE_TITLE}" ] && parseFetchedIssue
+echo "INFO! *SEMVER* [ ${SEMVER} ]"
+echo "INFO! *LATEST_TAG* [ ${LATEST_TAG} ]"
+echo "INFO! *PR_MILESTONE_TITLE* [ ${PR_MILESTONE_TITLE} ]"
+echo "INFO! *FETCHED_ISSUE_MILESTONE_TITLE* [ ${FETCHED_ISSUE_MILESTONE_TITLE} ]"
+[ -z "${SEMVER}" ] && return 1
+[ -z "${LATEST_TAG}" ] && return 1
+[ -z "${PR_MILESTONE_TITLE}" ] && return 1
+[ -z "${FETCHED_ISSUE_MILESTONE_TITLE}" ] && return 1
+echo 'OK!'
+# conditions
+#  issue milestone and pr milestone should be the same                 
+[ "${PR_MILESTONE_TITLE}" = "${FETCHED_ISSUE_MILESTONE_TITLE}" ] || return 1
 if [ "${SEMVER}" = "${LATEST_TAG}" ] ; then
   echo "INFO! *CURRENT_SEMVER* - ${SEMVER} equals *LATEST_TAG* - ${LATEST_TAG} "
   return 1
@@ -620,12 +631,15 @@ currentVersion=$(
 echo "$( git describe --tags ${lastTaggedCommit} )" |
 sed 's/v//'
 )
+echo "INFO! *currentVersion* [ ${currentVersion} ]"
+#  LATEST_TAG is from the fetched taglist on gitub
+#  currentTag is the last tagged stagged commit
+#  
 semverMajor=$( cut -d'.' -f1 <<<  ${currentVersion} )
 semverMinor=$( cut -d'.' -f2 <<<  ${currentVersion} )
 semverPatch=$( cut -d'.' -f3 <<<  ${currentVersion} )
-
 RELEASE_CURRENT_VERSION="v${semverMajor}.${semverMinor}.${semverPatch}"
-case "${ISSUE_MILESTONE}" in
+case "${PR_MILESTONE_TITLE}" in
   strategy-patch)
   RELEASE_NEW_VERSION="v${semverMajor}.${semverMinor}.$((semverPatch + 1))"
   ;;

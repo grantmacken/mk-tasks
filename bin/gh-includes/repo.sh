@@ -21,7 +21,6 @@ curl -s \
 SHORT_URL=$( echo "${doRequest}" | grep -oP 'Location: \K(.+)' )
 }
 
-
 function repoLists(){
   REPO_LISTS=(milestones labels tags issues branches pulls releases )
   for item in "${REPO_LISTS[@]}";

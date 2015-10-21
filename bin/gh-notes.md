@@ -18,7 +18,7 @@ associated with a simple *milestone* release strategy
 	- `gh new-issue-md`  a markdown file with a simple task list
 	- `gh create-issue`  from `ISSUE.md` file create a github issue
 	- `gh create-branch-from-issue`  from the new github issue create a branch off 
-  master. The isuue will have an associate milestone release-strategy and a
+  master. The issue will have an associate milestone release-strategy and a
   label.
 
 2. each issue has a public *task list* ( the feature branch being worked on)
@@ -46,6 +46,23 @@ Don't push until ready for a pull request
    uses the github issue number, so the task list gets pulled into the pull
    request
 	- `gh create-pull-request`
-	- `gh create-pr-compare-url-comment`
-	- `gh create-pr-shipit-comment`
 	- `gh info-pr-merge-state`
+
+5. satisfy merge criteria prior to merge
+    1. reviewed: a human has looked at this and added an approve comment
+    with the (pr-comments url) we can
+	- `gh create-pr-shipit-comment`
+	- `gh create-pr-compare-url-comment`
+	2. status: a machine has looked at this and passed any integration *tests*
+    (pr-status ) Tests are run in travis
+	not sure what to do here yet but ... linters etc.
+		-local tests then generate a 
+	    `gh create-pr-default-success-status`
+	3.  pull - commit - push fix any bugs based on comments and tests
+
+6. use github api to create a merge into master
+    1. merge message based on ISSUE.md
+	2. checkout master - pull --rebase
+	3. delete associated local branch and remote tracked branch
+
+	- ``

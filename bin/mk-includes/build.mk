@@ -1,8 +1,8 @@
 #==========================================================
-#  Build and XAR creation
-# modify repo.xml and expath-pkg.xml
-# inplace when semver or config changes
-# version comes from 'cat .semver' created from ... TODO'
+#  Build and XAR creation for eXist
+#
+# 
+# 
 #
 #==========================================================
 # SOURCES
@@ -12,33 +12,176 @@ SRC_CONFIG := $(CONFIG_FILE)
 SRC_SEMVER := $(SEMVER_FILE)
 SRC_PKG_XQ := $(shell find $(PKG_DIR) -name '*.xq*')
 SRC_PKG_XCONF := $(shell find $(PKG_DIR) -name '*.xconf*')
-SRC_PKG_XML := $(PKG_DIR)/repo.xml $(PKG_DIR)/expath-pkg.xml
-SRC_PKG_ROOT := $(SRC_PKG_XML) $(SRC_PKG_XCONF) $(SRC_PKG_XQ)
-
+# SRC_PKG_XML are templates config and semver are pre
+# 
+SRC_PKG_TMPL := $(PKG_DIR)/repo.xml $(PKG_DIR)/expath-pkg.xml
+SRC_PKG_MAIN := $(SRC_PKG_XCONF) $(SRC_PKG_XQ)
 
 #==========================================================
 # BUILD TARGET PATTERNS
 #==========================================================
 
-PKG_ROOT := $(patsubst $(PKG_DIR)/%, $(BUILD_DIR)/%, $(SRC_PKG_ROOT))
-ROOT_PKG_JSON := package.json
+PKG_MAIN := $(patsubst $(PKG_DIR)/%, $(BUILD_DIR)/%, $(SRC_PKG_MAIN))
+PKG_TMPL := $(patsubst $(PKG_DIR)/%, $(BUILD_DIR)/%, $(SRC_PKG_TMPL))
 
 #############################################################
 
-build: $(ROOT_PKG_JSON) $(SRC_PKG_ROOT) $(PKG_ROOT) $(XAR)
+PR_MERGED !=  echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.merged'    
+PR_TITLE !=  echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.title'    
+PR_MILESTONE_TITLE != echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.milestone | .title'    
+PR_MILESTONE_DESCRIPTION != echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.milestone | .description'    
+TAG_LATEST != echo "$$(<$(JSN_TAGS))" | jq -r -c '.[0] | .name '   
+RELEASE_UPLOAD_URL != echo "$$(<$(JSN_RELEASE))" | jq -r -c '.upload_url' | sed -r 's/\{.+//g'
+RELEASE_NAME != echo "$$(<$(JSN_RELEASE))" | jq -r -c '.name'
+RELEASE_TAG_NAME != echo "$$(<$(JSN_RELEASE))" | jq -r -c '.tag_name'
+#############################################################
+lastTaggedCommit != git rev-list --tags --max-count=1
+currentVersionString != git describe --tags $(lastTaggedCommit)
+currentVersion != echo "$$( git describe --tags $(lastTaggedCommit) )" | sed 's/v//'
+semverMajor !=  cut -d'.' -f1 <<<  $(currentVersion)
+semverMinor !=  cut -d'.' -f2 <<<  $(currentVersion)
+semverPatch !=  cut -d'.' -f3 <<<  $(currentVersion) 
+incSemverPatch != echo v$(semverMajor).$(semverMinor).$$(($(semverPatch) + 1))
+incSemverMinor != echo v$(semverMajor).$$(($(semverMinor) + 1)).$(semverPatch)
+incSemverMajor != echo v$$(($(semverMajor) + 1)).$(semverMinor).$(semverPatch)
 
-.PHONY: watch-build
+# #  doTask=$(
+#   git tag \
+#   -a ${RELEASE_NEW_VERSION} \
+#   -m '${ISSUE_MILESTONE} based on ${ISSUE_TITLE}'
+#   ) 
+
+build: $(SEMVER_FILE) $(PKG_TMPL) $(PKG_MAIN) $(XAR)
+
+.PHONY: watch-build info-build                          
 
 #@watch -q $(MAKE) icons
 watch-build:
 	@watch -q $(MAKE) build
 
-.PHONY:  watch-build
+build-info:
+	@echo 'BUILD INFORMATION'
+# @echo 'updating all main repo list'
+# @echo 'only newer files are updated, checks eTag'
+# @gh get-repo-lists
+	@echo 'check if last pull request has been merged'
+ifeq ($(PR_MERGED),true)
+	@echo $(PR_MERGED)   
+endif       
+	@echo "$(VERSION)"
+	@echo 'CURRENT BRANCH'
+	@echo $(CURRENT_BRANCH)
+	@echo 'REMOTE GH BRANCHES'
+	@echo "$$(<$(JSN_BRANCHES))" | jq -r -c '.[] | [ .name ]'    
+	@echo 'MILESTONES'
+	@echo "$$(<$(JSN_MILESTONES))" | jq -r -c '.[] | [ .title ]'    
+	@echo 'LABELS'
+	@echo "$$(<$(JSN_LABELS))" | jq -r -c '.[] | [ .name ]'    
+	@echo 'TAGS'                                            
+	@echo "$$(<$(JSN_TAGS))" | jq -r -c '.[] | [ .name ]'    
+	@echo 'ISSUES'                                            
+	@echo "$$(<$(JSN_ISSUES))" | jq -r -c '.[] | [ .name ]'    
+	@echo 'PULLS'
+	@echo "$$(<$(JSN_PULLS))" | jq -r -c '.[] | [ .name ]'    
+	@echo 'LAST PULL REQUEST'
+	@echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.number'    
+	@echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.state'    
+	@echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.title'    
+	@echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.merged'    
+	@echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.mergeable'    
+	@echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.mergeable_state'    
+	@echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.comments'    
+	@echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.commits'    
+	@echo 'RELEASES'
+	@echo "$$(<$(JSN_RELEASES))" | jq -r -c '.[] | [ .name ]'    
+	@echo "LATEST_RELEASE"
+	@echo "$$(<$(JSN_LATEST_RELEASE))" | jq -r -c '.name'    
+	@echo "$$(<$(JSN_LATEST_RELEASE))" | jq -r -c '.tag_name'    
+	@touch $(JSN_PULL_REQUEST)
+	@echo $(lastTaggedCommit)
+	@echo $(currentVersionString)
+	@echo $(currentVersion)
+	@echo $(semverMajor)
+	@echo $(semverMinor)
+	@echo $(semverPatch) 
+ifeq ($(PR_MERGED),true)
+	@echo 'whenever the pull request has been merged'
+	@echo $(PR_MERGED)   
+	@echo 'create a release based on strategy'
+	@echo $(PR_MILESTONE_TITLE)
+ifeq ($(PR_MILESTONE_TITLE),strategy-major)
+	@echo $(incSemverMajor)   
+	@echo "$(incSemverMajor)"  > $(SEMVER_FILE)
+endif
+ifeq ($(PR_MILESTONE_TITLE),strategy-minor)
+	@echo 'STRATEGY MINOR'
+	@echo $(currentVersion)
+	@echo $(incSemverMinor)   
+	@echo "$(incSemverMinor)"  > $(SEMVER_FILE)
+	@echo '------------------------------------'
+endif   
+ifeq ($(PR_MILESTONE_TITLE),strategy-patch)
+	@echo $(incSemverPatch)   
+	@echo "$(incSemverPatch)"  > $(SEMVER_FILE)
+endif 
+	@echo "$(VERSION)"
+endif 
 
-#############################################################
+build-release:
+	@echo 'BUILD INFORMATION'
+	@echo 'check if last pull request has been merged'
+ifeq ($(PR_MERGED),true)
+	@echo $(PR_MERGED)   
+	@echo 'last tagged release'
+	@echo $(TAG_LATEST)   
+	@echo $(currentVersion) 
+	@echo 'next tagged release'
+	@echo 'tag-name: $(VERSION)'
+	@echo 'name: $(ABBREV)-$(VERSION)'
+	@echo 'body: $(PR_TITLE)  $(PR_MILESTONE_DESCRIPTION) merged into master '
+	@gh create-release '$(VERSION)' '$(ABBREV)-$(VERSION)'\
+		'$(PR_TITLE) -  $(PR_MILESTONE_DESCRIPTION) merged into master'
+endif  
+
+build-asset:
+ifeq ($(PR_MERGED),true)
+	@echo $(PR_MERGED)   
+	@gh get-latest-release 
+	@echo $(RELEASE_UPLOAD_URL)
+	@echo $(RELEASE_NAME)
+	@gh create-release-asset '$(RELEASE_UPLOAD_URL)' '$(RELEASE_NAME)'
+endif  
+
+
+$(SEMVER_FILE): $(JSN_PULL_REQUEST)
+	@echo "SEMVER"
+	@touch $(JSN_PULL_REQUEST)
+ifeq ($(PR_MERGED),true)
+	@echo 'whenever the pull request has been merged'
+	@echo $(PR_MERGED)   
+	@echo 'create a release based on strategy'
+	@echo $(PR_MILESTONE_TITLE)
+	@echo 'get the latest release tag'
+	@echo "$$(<$(JSN_LATEST_RELEASE))" | jq -r -c '.tag_name'
+	@echo "$$(<$(JSN_LATEST_RELEASE))" | jq -r -c '.tag_name' > $@
+	@echo "$$(<$(SEMVER_FILE))"
+ifeq ($(PR_MILESTONE_TITLE),strategy-major)
+	@echo $(incSemverMajor)   
+	@echo $(incSemverMajor)  > $(SEMVER_FILE)
+endif 
+ifeq ($(PR_MILESTONE_TITLE),strategy-minor)
+	@echo $(incSemverMinor)   
+	@echo $(incSemverMinor)  > $(SEMVER_FILE)
+endif   
+ifeq ($(PR_MILESTONE_TITLE),strategy-patch)
+	@echo $(incSemverPatch)   
+	@echo $(incSemverPatch)  > $(SEMVER_FILE)
+endif 
+	@echo "$(VERSION)"
+endif
 
 # use cheerio as xml parser
-$(PKG_DIR)/repo.xml: $(SRC_CONFIG) $(SRC_SEMVER)
+$(BUILD_DIR)/repo.xml: $(CONFIG_FILE) $(SEMVER_FILE)
 	@echo  "MODIFY $@"
 	@echo  "SRC  $< "
 	@node -e "\
@@ -51,7 +194,7 @@ $(PKG_DIR)/repo.xml: $(SRC_CONFIG) $(SRC_SEMVER)
  n('target').text('$(REPO)');\
  require('fs').writeFileSync('$@', n.xml() )"
 
-$(PKG_DIR)/expath-pkg.xml: $(SRC_CONFIG) $(SRC_SEMVER)
+$(BUILD_DIR)/expath-pkg.xml: $(CONFIG_FILE)
 	@echo  "MODIFY $@"
 	@echo  "SRC  $< "
 	@node -e "\
@@ -65,25 +208,16 @@ $(PKG_DIR)/expath-pkg.xml: $(SRC_CONFIG) $(SRC_SEMVER)
  n('title').text('$(REPO)');\
  require('fs').writeFileSync('./$@', n.xml() )"
 
-$(ROOT_PKG_JSON): $(SRC_CONFIG) $(SRC_SEMVER)
-	@echo  "MODIFY $@"
-	@echo  "SRC  $<"
-	@node -e "\
-  var j = require('./$@');\
-  j.version = '$(VERSION)';\
-  j.name = '$(REPO)';\
-  j.description = '$(DESCRIPTION)';\
-  j.author = '$(AUTHOR)';\
-  var s = JSON.stringify(j, null, 2);\
-  require('fs').writeFileSync('./$@', s);"
-
 # Copy over package root files
 $(BUILD_DIR)/%: $(PKG_DIR)/%
 	@mkdir -p $(dir $@)
 	@echo "FILE $@ $<"
 	@cp $< $@
 
+# Create package with zip
+# but exclude the data dir
+# TODO! might also exclude binary media
 $(XAR): $(wildcard $(BUILD_DIR)/* )
 	@mkdir -p $(dir $@)
 	@echo "XAR FILE $@"
-	@cd $(BUILD_DIR); zip -r ../$@ .
+	@cd $(BUILD_DIR); zip -r ../$@ . -x 'data*'
