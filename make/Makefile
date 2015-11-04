@@ -18,13 +18,14 @@ ifneq ($(wildcard $(PID_TINY_LR)),)
   TINY-LR_UP :=  $(shell ps "$$(<$(PID_TINY_LR))" | awk '/tiny-lr/{print $$1,$$5}')
 else
   TINY-LR_UP :=
-endif           
+endif
 
 ifeq ($(wildcard $(SEMVER_FILE)),)
  $(file > $(SEMVER_FILE),v0.0.0)
-endif           
+endif
 
 VERSION != echo "$$(<$(SEMVER_FILE))"
+
 STORED != tail -n 1 $(XMLDB_LOG) | grep -oP 'storing document \K(.+)'
 
 #recurcive wildcard function
@@ -60,6 +61,17 @@ API_REPO := $(REPO_BASE_URL)/repos/$(REPO_SLUG)
 WEBSITE := http://$(REPO)
 CURRENT_DATE  != date "+%Y-%m-%d"
 CURRENT_DATE_TIME != date "+%Y-%m-%dT%H:%M:%S"
+
+# common functions
+getMimeType = $(shell node -pe "\
+ fs = require('fs');\
+ re = /$1/;\
+ n = require('cheerio').load(fs.readFileSync('$(EXIST_HOME)/mime-types.xml'),\
+ { normalizeWhitespace: true, xmlMode: true});\
+ n('extensions').filter(function(i, el){\
+ return re.test(n(this).text());\
+ }).parent().attr('name');\
+")
 
 include $(TASKS_DIR)/*.mk
 
@@ -112,10 +124,10 @@ www: $(STYLES) $(PAGES)
 watch-www:
 	@watch -q $(MAKE) www
 
-all: $(BUILD_XQUERY_MODULES) $(BUILD_HTML_TEMPLATES) 
+all: $(BUILD_XQUERY_MODULES) $(BUILD_HTML_TEMPLATES)
 
 watch-all:
-	@watch -q $(MAKE) 
+	@watch -q $(MAKE)
 
 .PHONY:  watch-www tmx help
 

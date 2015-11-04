@@ -23,57 +23,51 @@ else
   git commit -am 'prep for pull-request'
 fi
 
-
 if [ -e ${JSN_PULL_REQUEST} ] ; then
-  PR_NUMBER="$(node -pe "require('${GITHUB_PULL_REQUEST}')['number']")"
+  PR_NUMBER="$(node -pe "require('$(parseIntoNodeFS ${JSN_PULL_REQUEST})')['number']")"
+  FETCHED_ISSUE_NUMBER="$(node -pe "require('$(parseIntoNodeFS ${JSN_ISSUE})')['number']")"
   echo "INFO! - PR_NUMBER [ ${PR_NUMBER} ]"
-  [ ${PR_NUMBER} -ne ${FETCHED_ISSUE_NUMBER} ] && {
-   etagFile=$(parseIntoETAG ${JSN_PULL_REQUEST})
-   headerFile=$(parseIntoHEADER ${JSN_PULL_REQUEST})
-  if [ -e ${etagFile} ] ; then
-    echo "TASK! - remove [  ${etagFile} ]"
-    rm ${etagFile}
+  echo "INFO! - FETCHED_ISSUE_NUMBER [ ${FETCHED_ISSUE_NUMBER} ]"
+  echo "CHECK! if issue has become pull request"
+  if [ ${PR_NUMBER} -eq ${FETCHED_ISSUE_NUMBER} ] ; then
+      echo "YEP! issue is now pull request"
+  else
+    fileARR=(
+    ${JSN_PR_COMMENT}
+    ${JSN_PR_COMMENTS}
+    ${JSN_PR_COMMITS}
+    ${JSN_PR_STATUSES}
+    ${JSN_PR_COMBINED_STATUS}
+    ${JSN_PR_MERGE}
+    )
+
+    for fileItem in "${fileARR[@]}"
+    do
+    etagFile=$(parseIntoETAG ${fileItem})
+    headerFile=$(parseIntoHEADER ${fileItem})
+    if [ -e ${fileItem} ] ; then
+        echo "TASK! - remove [  ${fileItem} ]"
+        rm ${fileItem}
+    fi
+    if [ -e ${etagFile} ] ; then
+        echo "TASK! - remove [  ${etagFile} ]"
+        rm ${etagFile}
+    fi
+    if [ -e ${headerFile} ] ; then
+        echo "TASK! - remove [  ${headerFile} ]"
+        rm ${headerFile}
+    fi
+    done  
   fi
-  if [ -e ${headerFile} ] ; then
-    echo "TASK! - remove [  ${headerFile} ]"
-    rm ${headerFile}
-  fi
-  }
 fi
 
-fileARR=(
-  ${JSN_PR_COMMENT}
-  ${JSN_PR_COMMENTS}
-  ${JSN_PR_COMMITS}
-  ${JSN_PR_STATUSES}
-  ${JSN_PR_COMBINED_STATUS}
-  ${JSN_PR_MERGE}
-)
-
-for fileItem in "${fileARR[@]}"
-do
-  etagFile=$(parseIntoETAG ${fileItem})
-  headerFile=$(parseIntoHEADER ${fileItem})
-  if [ -e ${fileItem} ] ; then
-    echo "TASK! - remove [  ${fileItem} ]"
-    rm ${fileItem}
-  fi
-  if [ -e ${etagFile} ] ; then
-    echo "TASK! - remove [  ${etagFile} ]"
-    rm ${etagFile}
-  fi
-  if [ -e ${headerFile} ] ; then
-    echo "TASK! - remove [  ${headerFile} ]"
-    rm ${headerFile}
-  fi
-done
 
 parseFetchedIssue > /dev/null
 #echo "INFO! - *ISSUE_PULLS_URL* [ ${ISSUE_PULLS_URL} ]"
 if [ -z "${ISSUE_PULLS_URL}" ] ; then
    echo "CHECK! - fetched issue has no pulls url [  'OK!' ]"
 else
-   echo "CHECK! - issue pulls url [  'FAIL!' ]"
+   echo "CHECK! - issue pulls url [  'no pulls url yet for issue!' ]"
    return 1
 fi
 
@@ -679,7 +673,7 @@ fi
 echo "TASK! checkout master"
 doTask=$( git checkout ${PR_BASE_REF} )
 echo "DONE! checked out master ${doTask}"
-source "${BIN_DIR}/project.properties"
+source "../project.properties"
 echo "INFO! - CURRENT_BRANCH [ ${CURRENT_BRANCH} ]"
 if [ ${CURRENT_BRANCH} = 'master' ] ; then
   echo "TASK! working directory up to date with origin"
@@ -692,47 +686,47 @@ if [ ${CURRENT_BRANCH} = 'master' ] ; then
   echo "TASK! delete remote branch ${CURRENT_BRANCH}"
   doTask=$(git push origin --delete ${PR_HEAD_REF})
   echo "DONE! ${doTask}"
-  echo "TASK! delete issue and associated pull-request files"
-  [ -e ${JSN_ISSUE} ] && {
-   etagFile=$(parseIntoETAG ${JSN_ISSUE})
-   rm ${JSN_ISSUE}
-   rm ${etagFile}
-   }
-  [ -e ${JSN_PULL_REQUEST} ] && {
-   etagFile=$(parseIntoETAG ${JSN_PULL_REQUEST})
-   rm ${JSN_PULL_REQUEST}
-   rm ${etagFile}
-   }
-  [ -e ${JSN_PR_STATUSES} ] && {
-    etagFile=$(parseIntoETAG ${JSN_PR_STATUSES})
-    rm ${JSN_PR_STATUSES}
-    rm ${etagFile}
-    }
-  [ -e ${JSN_PR_COMMITS} ] && {
-    etagFile=$(parseIntoETAG ${JSN_PR_COMMITS})
-    rm ${JSN_PR_COMMITS}
-    rm ${etagFile}
-    }
-  [ -e ${JSN_PR_STATUS} ] && {
-    etagFile=$(parseIntoETAG ${JSN_PR_STATUS})
-    rm ${JSN_PR_STATUS}
-    rm ${etagFile}
-    }
-  [ -e ${JSN_PR_COMMENTS} ] && {
-    etagFile=$(parseIntoETAG ${JSN_PR_COMMENTS})
-    rm ${JSN_PR_COMMENTS}
-    rm ${etagFile}
-    }
-  [ -e ${JSN_PR_COMMENT} ] && {
-    etagFile=$(parseIntoETAG ${JSN_PR_COMMENT})
-    rm ${JSN_PR_COMMENT}
-    rm ${etagFile}
-   }
-  [ -e ${JSN_MERGE} ] && {
-    etagFile=$(parseIntoETAG ${JSN_MERGE})
-    rm ${JSN_MERGE}
-    rm ${etagFile}
-    }
+  # echo "TASK! delete issue and associated pull-request files"
+  # [ -e ${JSN_ISSUE} ] && {
+  #  etagFile=$(parseIntoETAG ${JSN_ISSUE})
+  #  rm ${JSN_ISSUE}
+  #  rm ${etagFile}
+  #  }
+  # [ -e ${JSN_PULL_REQUEST} ] && {
+  #  etagFile=$(parseIntoETAG ${JSN_PULL_REQUEST})
+  #  rm ${JSN_PULL_REQUEST}
+  #  rm ${etagFile}
+  #  }
+  # [ -e ${JSN_PR_STATUSES} ] && {
+  #   etagFile=$(parseIntoETAG ${JSN_PR_STATUSES})
+  #   rm ${JSN_PR_STATUSES}
+  #   rm ${etagFile}
+  #   }
+  # [ -e ${JSN_PR_COMMITS} ] && {
+  #   etagFile=$(parseIntoETAG ${JSN_PR_COMMITS})
+  #   rm ${JSN_PR_COMMITS}
+  #   rm ${etagFile}
+  #   }
+  # [ -e ${JSN_PR_STATUS} ] && {
+  #   etagFile=$(parseIntoETAG ${JSN_PR_STATUS})
+  #   rm ${JSN_PR_STATUS}
+  #   rm ${etagFile}
+  #   }
+  # [ -e ${JSN_PR_COMMENTS} ] && {
+  #   etagFile=$(parseIntoETAG ${JSN_PR_COMMENTS})
+  #   rm ${JSN_PR_COMMENTS}
+  #   rm ${etagFile}
+  #   }
+  # [ -e ${JSN_PR_COMMENT} ] && {
+  #   etagFile=$(parseIntoETAG ${JSN_PR_COMMENT})
+  #   rm ${JSN_PR_COMMENT}
+  #   rm ${etagFile}
+  #  }
+  # [ -e ${JSN_MERGE} ] && {
+  #   etagFile=$(parseIntoETAG ${JSN_MERGE})
+  #   rm ${JSN_MERGE}
+  #   rm ${etagFile}
+  #   }
 fi
 
 }

@@ -22,9 +22,9 @@ echo "DONE! status: [ ${doRequest} ]"
 if [[ ${doRequest} = 200  || ${doRequest} = 304   ]]
 then
   if [ -e ${TEMP_XML} ] ;then
-	return 0
+    return 0
   else
-	return 1
+    return 1
   fi
 ellse
   returnll 1
@@ -57,9 +57,9 @@ echo "DONE! status: [ ${doRequest} ]"
 if [[ ${doRequest} = 200  || ${doRequest} = 304 || ${doRequest} = 201  ]]
 then
   if [ -e ${TEMP_XML} ] ;then
-	return 0
+    return 0
   else
-	return 1
+    return 1
   fi
 else
   return 1
@@ -91,9 +91,9 @@ echo "DONE! status: [ ${doRequest} ]"
 if [[ ${doRequest} = 200  || ${doRequest} = 304 || ${doRequest} = 201  ]]
 then
   if [ -e ${TEMP_XML} ] ;then
-	return 0
+    return 0
   else
-	return 1
+    return 1
   fi
 else
   return 1
@@ -102,13 +102,14 @@ fi
 
 
 function existPost(){
+[ -n "${VERBOSE}" ] && \
 echo 'TASK! POST QUERY'
 # echo ${query}
 # echo ${TEMP_XML}
-local POST=$(   
+local POST=$(
 cat << EOF
 <query xmlns="http://exist.sourceforge.net/NS/exist" start="1" max="${max}">
-<text><![CDATA[    
+<text><![CDATA[
 ${query}
 ]]></text>
 </query>
@@ -127,14 +128,15 @@ curl -s \
   -d "${POST}" \
   http://${HOST}:8080/exist/rest/db
 )
+[ -n "${VERBOSE}" ] && \
 echo "DONE! status: [ ${doRequest} ]"
 # echo $(<${TEMP_XML})
 if [[ ${doRequest} = 200  || ${doRequest} = 304 || ${doRequest} = 201  ]]
 then
   if [ -e ${TEMP_XML} ] ;then
-	return 0
+    return 0
   else
-	return 1
+    return 1
   fi
 else
   return 1

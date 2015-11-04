@@ -344,6 +344,7 @@ nSTR="J = require('${jsnFile}');\
   console.log('REPO_LABELS_URL=' +  J.labels_url.split('{')[0]);\
   console.log('REPO_MILESTONES_URL=' +  J.milestones_url.split('{')[0]);\
   console.log('REPO_PULLS_URL=' +  J.pulls_url.split('{')[0]);\
+  console.log('REPO_GIT_REFS_URL=' +  J.git_refs_url.split('{')[0]);\
   console.log('REPO_RELEASES_URL=' +  J.releases_url.split('{')[0]);\
   console.log('REPO_COMMITS_URL=' +  J.commits_url.split('{')[0]);\
   console.log('REPO_COMMENTS_URL=' +  J.comments_url.split('{')[0]);\
@@ -356,7 +357,7 @@ source <(node -e "${nSTR}")
 
 function parsePullRequest(){
 [ ! -e "${JSN_PULL_REQUEST}" ] && return 1
-nSTR="J = require('$( parseIntoNodeFS ${GITHUB_PULL_REQUEST} )');\
+nSTR="J = require('$( parseIntoNodeFS ${JSN_PULL_REQUEST} )');\
  R = require('ramda');\
  j = R.pick([\
  'html_url','title','number','milestone','state', 'commits' , 'updated_at',\
@@ -409,37 +410,6 @@ nSTR="J = require('$( parseIntoNodeFS ${GITHUB_PULL_REQUEST} )');\
 # debug with below
 # node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
 source <(node -e "${nSTR}")
-# same as issue
-# echo "INFO! - *PR_UPDATED_AT*: [ ${PR_UPDATED_AT} ]"
-# echo "INFO! - *PR_NUMBER*: [ ${PR_NUMBER} ]"
-# echo "INFO! - *PR_TITLE*: [ ${PR_TITLE} ]"
-# echo "INFO! - *PR_MILESTONE_TITLE*: [ ${PR_MILESTONE_TITLE} ]"
-# echo "INFO! - *PR_MILESTONE_NUMBER*: [ ${PR_MILESTONE_NUMBER} ]"
-# echo "INFO! - *PR_STATE*: [ ${PR_STATE} ]"
-# echo "INFO! - *PR_COMMENTS*: [ ${PR_COMMENTS} ]"
-# echo "INFO! - *PR_BODY* ... "
-# # merge state
-# echo ''
-# echo "INFO! - *PR_COMMITS*: [ ${PR_COMMITS} ]"
-# echo "INFO! - *PR_MERGED*: [ ${PR_MERGED} ]"
-# echo "INFO! - *PR_MERGEABLE*: [ ${PR_MERGEABLE} ]"
-# echo "INFO! - *PR_MERGEABLE_STATE*: [ ${PR_MERGEABLE_STATE} ]"
-# echo "INFO! - *PR_REVIEW_COMMENTS*: [ ${PR_REVIEW_COMMENTS} ]"
-# echo "INFO! - *PR_COMMENTS*: [ ${PR_COMMENTS} ]"
-# echo ''
-# # URLs
-# echo "INFO! - *PR_URL*: [ ${PR_URL} ]"
-# echo "INFO! - *PR_COMMENTS_URL*: [ ${PR_COMMENTS_URL} ]"
-# echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
-# echo "INFO! - *PR_REVIEW_COMMENTS_URL*: [ ${PR_REVIEW_COMMENTS_URL} ]"
-# echo "INFO! - *PR_COMMITS_URL*: [ ${PR_COMMITS_URL} ]"
-# echo "INFO! - *PR_HTML_URL*: [ ${PR_HTML_URL} ]"
-#echoLine
-# echo "${PR_BODY}"
-# echo "INFO! - *PR_HEAD_SHA*: [ ${PR_HEAD_SHA} ]"
-# echo "INFO! - *PR_BASE_SHA*: [ ${PR_BASE_SHA} ]"
-# echo "INFO! - *PR_HEAD_REF*: [ ${PR_HEAD_REF} ]"
-# echo "INFO! - *PR_BASE_REF*: [ ${PR_BASE_REF} ]"
 }
 
 
@@ -507,15 +477,30 @@ echo "INFO! - *RELEASE_NAME*: [ ${RELEASE_NAME} ]"
 }
 
 function parseLatestRelease(){
-if [ ! -e "${JSN_LATEST_RELEASE}" ] ; then
-  echo "FAILURE: file required ${JSN_LATEST_RELEASE}"
-  return 1
-fi
-RELEASE_UPLOAD_URL=
+[ ! -e "${JSN_LATEST_RELEASE}" ] && return 1
+jsnFile="$(parseIntoNodeFS ${JSN_LATEST_RELEASE})"
+nSTR="J = require('${jsnFile}');\
+  console.log('RELEASE_URL=' + J.url);\
+  console.log('RELEASE_NAME=' + J.name);\
+  console.log('RELEASE_TAG_NAME=' + J.tag_name);\
+  console.log('RELEASE_UPLOAD_URL=' + J.upload_url.split('{')[0] );\
+  console.log('RELEASE_ID=' + J.id);\
+  console.log('RELEASE_BODY=\"' + J.body + '\"');\
+  if (J.assets.length ) { console.log('RELEASE_ASSET_COUNT=' + J.assets.length) }
+"
+source <(node -e "${nSTR}")
+node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
+
+return 0
+# if [ ! -e "${JSN_LATEST_RELEASE}" ] ; then
+#   echo "FAILURE: file required ${JSN_LATEST_RELEASE}"
+#   return 1
+# fi
+# RELEASE_UPLOAD_URL=
 #HTML_URL=
-RELEASE_TAG_NAME=
+# RELEASE_TAG_NAME=
 #TARGET_COMMITISH=
-RELEASE_NAME=
+# RELEASE_NAME=
 #TARBALL_URL=
 #ZIPBALL_URL=
 #BODY=
@@ -525,32 +510,32 @@ RELEASE_NAME=
 #DOWNLOAD_COUNT=
 #BROWSER_DOWNLOAD_URL=
 
-local jsnFile="$( parseIntoNodeFS ${JSN_LATEST_RELEASE} )"
+# local jsnFile="$( parseIntoNodeFS ${JSN_LATEST_RELEASE} )"
 
-nSTR="J = require('${jsnFile}');\
- R = require('ramda');\
- j = R.pick([\
- 'upload_url','tag_name','name'
- ],J);\
- upload_url = 'RELEASE_UPLOAD_URL=' + \
-  R.substringTo(R.strIndexOf('{',R.prop('upload_url',j)),R.prop('upload_url',j)) \
-  + '?name=';\
- tag_name = 'RELEASE_TAG_NAME=' + R.prop('tag_name',j);\
- name = 'RELEASE_NAME=' + R.prop('name',j);\
- print = function(x){console.log(x)};\
- R.forEach(print, [\
- upload_url,\
- tag_name, \
- name
- ]);\
-"
+# nSTR="J = require('${jsnFile}');\
+#  R = require('ramda');\
+#  j = R.pick([\
+#  'upload_url','tag_name','name'
+#  ],J);\
+#  upload_url = 'RELEASE_UPLOAD_URL=' + \
+#   R.substringTo(R.strIndexOf('{',R.prop('upload_url',j)),R.prop('upload_url',j)) \
+#   + '?name=';\
+#  tag_name = 'RELEASE_TAG_NAME=' + R.prop('tag_name',j);\
+#  name = 'RELEASE_NAME=' + R.prop('name',j);\
+#  print = function(x){console.log(x)};\
+#  R.forEach(print, [\
+#  upload_url,\
+#  tag_name, \
+#  name
+#  ]);\
+# "
 
 #node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
-source <(node -e "${nSTR}")
+# source <(node -e "${nSTR}")
 
-echo "INFO! - *RELEASE_UPLOAD_URL*: [ ${RELEASE_UPLOAD_URL} ]"
-echo "INFO! - *RELEASE_TAG_NAME*: [ ${RELEASE_TAG_NAME} ]"
-echo "INFO! - *RELEASE_NAME*: [ ${RELEASE_NAME} ]"
+# echo "INFO! - *RELEASE_UPLOAD_URL*: [ ${RELEASE_UPLOAD_URL} ]"
+# echo "INFO! - *RELEASE_TAG_NAME*: [ ${RELEASE_TAG_NAME} ]"
+# echo "INFO! - *RELEASE_NAME*: [ ${RELEASE_NAME} ]"
 }
 
 

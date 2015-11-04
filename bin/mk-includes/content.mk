@@ -78,7 +78,7 @@ OUT_POSTS :=  $(TEMP_FM_ARTICLE_POSTS) $(TEMP_MD_ARTICLE_POSTS) $(OUT_DATA_POSTS
 
 # $(foreach src,$(OUT_POSTS),$(shell mkdir -p $(dir $(src))))
 
-content: $(OUT_POSTS)
+content: $(OUT_POSTS) $(OUT_PAGES)
 
 watch-pages:
 	@watch -q $(MAKE) content

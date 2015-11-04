@@ -26,14 +26,25 @@ PKG_TMPL := $(patsubst $(PKG_DIR)/%, $(BUILD_DIR)/%, $(SRC_PKG_TMPL))
 
 #############################################################
 
+
+ifneq ($(wildcard $(JSN_PULL_REQUEST)),)
 PR_MERGED !=  echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.merged'    
 PR_TITLE !=  echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.title'    
 PR_MILESTONE_TITLE != echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.milestone | .title'    
 PR_MILESTONE_DESCRIPTION != echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.milestone | .description'    
+endif           
+
+ifneq ($(wildcard $(JSN_TAGS)),)
 TAG_LATEST != echo "$$(<$(JSN_TAGS))" | jq -r -c '.[0] | .name '   
+endif           
+
+ifneq ($(wildcard $(JSN_RELEASE)),)
 RELEASE_UPLOAD_URL != echo "$$(<$(JSN_RELEASE))" | jq -r -c '.upload_url' | sed -r 's/\{.+//g'
 RELEASE_NAME != echo "$$(<$(JSN_RELEASE))" | jq -r -c '.name'
 RELEASE_TAG_NAME != echo "$$(<$(JSN_RELEASE))" | jq -r -c '.tag_name'
+endif           
+
+PACKAGE_VERSION != echo "$$(<$(SEMVER_FILE))" | sed 's/v//'
 #############################################################
 lastTaggedCommit != git rev-list --tags --max-count=1
 currentVersionString != git describe --tags $(lastTaggedCommit)
@@ -181,29 +192,29 @@ endif
 endif
 
 # use cheerio as xml parser
-$(BUILD_DIR)/repo.xml: $(CONFIG_FILE) $(SEMVER_FILE)
+$(BUILD_DIR)/repo.xml: $(PKG_DIR)/repo.xml $(CONFIG_FILE) $(SEMVER_FILE)
 	@echo  "MODIFY $@"
 	@echo  "SRC  $< "
 	@node -e "\
  var cheerio = require('cheerio');var fs = require('fs');\
- var x = fs.readFileSync('./$@').toString();\
+ var x = fs.readFileSync('./$<').toString();\
  var n = cheerio.load(x,{normalizeWhitespace: false,xmlMode: true});\
  n('description').text('$(DESCRIPTION)');\
  n('author').text('$(AUTHOR)');\
  n('website').text('$(WEBSITE)');\
  n('target').text('$(REPO)');\
- require('fs').writeFileSync('$@', n.xml() )"
+ require('fs').writeFileSync('./$@', n.xml() )"
 
-$(BUILD_DIR)/expath-pkg.xml: $(CONFIG_FILE)
+$(BUILD_DIR)/expath-pkg.xml: $(PKG_DIR)/expath-pkg.xml $(CONFIG_FILE)
 	@echo  "MODIFY $@"
 	@echo  "SRC  $< "
 	@node -e "\
  var cheerio = require('cheerio');var fs = require('fs');\
- var x = fs.readFileSync('./$@').toString();\
+ var x = fs.readFileSync('./$<').toString();\
  var n = cheerio.load(x,{normalizeWhitespace: false,xmlMode: true});\
  n('package').attr('name', '$(REPO)');\
  n('package').attr('abbrev', '$(ABBREV)' );\
- n('package').attr('version', '$(VERSION)');\
+ n('package').attr('version', '$(PACKAGE_VERSION)');\
  n('package').attr('spec', '1.0');\
  n('title').text('$(REPO)');\
  require('fs').writeFileSync('./$@', n.xml() )"

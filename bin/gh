@@ -523,9 +523,9 @@ EOF
   echo "INFO! - *PR_COMBINED_STATUS_STATE*: [ ${PR_COMBINED_STATUS_STATE} ]"
   exit
   ;;
-	echo-pr-merged)
+  echo-pr-merged)
   params=( )
-	parsePullRequest > /dev/null
+  parsePullRequest > /dev/null
   echo "${PR_MERGED}" 
 	exit
 	;;
@@ -538,12 +538,12 @@ EOF
   parseCombinedStatus > /dev/null
   prPriorMerge || exit
   #parsePullRequest
-  commitMessage="pull request merged #${ISSUE_NUMBER} summary - ${ISSUE_SUMMARY}"
+  commitMessage="pull request merged #${PR_NUMBER} title - ${PR_TITLE}"
   jsn="{\"commit_message\":\"${commitMessage}\", \"sha\":\"${PR_HEAD_SHA}\"}"
   echo "$jsn" | R -p 'id'
-  method='PUT'
+  method='PUT'        
   requestURL="${PR_URL}/merge"
-  outFile="${JSN_PR_MERGE}"
+  outFile="${JSN_MERGE}"
   expectResponse=200
   #thenDo='merged-pull-request'
   ;;
@@ -556,7 +556,7 @@ EOF
   params=( )
   gh 'get-current-pull-request' || exit
   parsePullRequest > /dev/null
-  mergedPullRequest
+  # mergedPullRequest
   exit
   ;;
   get-pr-lists)
@@ -721,7 +721,10 @@ EOF
   exit
   ;;
 # TAGS
-#https://developer.github.com/v3/repos/#list-tags
+# https://developer.github.com/v3/repos/#list-tags
+# https://developer.github.com/v3/git/refs/
+# ? tag is create when we create a release
+#o should be able to delete tag by deleleting release
   get-tags)
   params=( )
   method='GET'
@@ -738,6 +741,14 @@ EOF
   params=( )
   parseTags
   exit
+  ;;
+  delete-tag)
+  params=( tag_name )
+  method=DELETE
+  baseURL="${REPO_GIT_REFS_URL}/tags"
+  requestURL="${baseURL}/${1}"
+  expectResponse=204
+  outFile=
   ;;
 #RELEASES
 # https://developer.github.com/changes/2013-09-25-releases-api/
@@ -774,28 +785,27 @@ EOF
   update-semver)
   params=( )
   omUpdateSemver
+  touch config               
+  make build
   exit
   ;;
   release)
   params=( )
-  parseTags > /dev/null
-  parseIssueMD > /dev/null
-  parseFetchedIssue > /dev/null
-  parseLatestRelease > /dev/null
-  omPriorReleaseConditions
-	exit
-  omUpdateSemver
-  make build
-  #omCreateAnnotatedTag
-  #gh get-tags
-  parseTags > /dev/null
-  bodyTxt="${ISSUE_LABEL} merged into master \nISSUE - ${ISSUE_TITLE}"
-  nameTxt="${ABBREV}-${LATEST_TAG}"
-  tagNameTxt="${LATEST_TAG}"
+  # parseTags > /dev/null
+  # parseIssueMD > /dev/null
+  # parseFetchedIssue > /dev/null
+  # parseLatestRelease > /dev/null
+  # omPriorReleaseConditions
+  SEMVER="$(<${SEMVER_FILE})"
+  parsePullRequest > /dev/null
+  bodyTxt="${PR_MILESTONE_TITLE} merged into master \n - ${PR_TITLE}"
+  nameTxt="${ABBREV}-${SEMVER}"
+  tagNameTxt="${SEMVER}"
   echo "INFO! *body* [ ${bodyTxt} ] "
   echo "INFO! *tag_name* [ ${tagNameTxt} ] "
   echo "INFO! *name* [ ${nameTxt} ] "
   gh create-release "${tagNameTxt}" "${nameTxt}" "${bodyTxt}"
+  exit
   gh get-latest-release
   gh parse-latest-release
   gh create-release-asset
@@ -809,11 +819,12 @@ EOF
   jsn="{\"tag_name\":\"${1}\",\"target_commitish\":\"master\",\"name\":\"${2}\",\"body\":\"${3}\",\"draft\":false,\"prerelease\":false}"
   echo "${jsn}" | R -p 'id'
   expectResponse=201
-  ;;
+  ;;             
+	# 
   delete-release)
   params=(releaseID)
   method='DELETE'
-  baseURL="{REPO_RELEASES_URL}"
+  baseURL="${REPO_RELEASES_URL}"
   requestURL="${baseURL}/${1}"
   expectResponse=204
   outFile=
@@ -825,12 +836,14 @@ EOF
   ;;
 #RELEASE ASSETS
   create-release-asset)
-  params=( upload_url name )
+  params=( )
+  parseLatestRelease
   method='UPLOAD'
-  requestURL="${1}?name=${2}.xar"
+  upFile="pkg/xar/${RELEASE_NAME}.xar"
+  [ -e $upFile ]  || exit
+  requestURL="${RELEASE_UPLOAD_URL}?name=${RELEASE_NAME}.xar"
   outFile="${JSN_ASSET_UPLOADED}"
   contentType='application/zip'
-  upFile="pkg/xar/${2}.xar"
   expectResponse=201
   # echo "INFO! *RELEASE_ASSET* [ ${upFile} ] "
   ;;

@@ -605,8 +605,12 @@ omUpdateSemver(){
 [ -z "${LATEST_TAG}" ] &&  parseTags  > /dev/null
 [ -z "${PR_MILESTONE_TITLE}" ] && parsePullRequest 
 [ -z "${FETCHED_ISSUE_MILESTONE_TITLE}" ] && parseFetchedIssue
+[ -z "${currentVersion}" ] && \
+    currentVersion="$( xq app-semver  | sed 's/v//' )"
+
 echo "INFO! *SEMVER* [ ${SEMVER} ]"
 echo "INFO! *LATEST_TAG* [ ${LATEST_TAG} ]"
+echo "INFO! *INSTALLED_VERSION* [ ${INSTALLED_VERSION} ]"
 echo "INFO! *PR_MILESTONE_TITLE* [ ${PR_MILESTONE_TITLE} ]"
 echo "INFO! *FETCHED_ISSUE_MILESTONE_TITLE* [ ${FETCHED_ISSUE_MILESTONE_TITLE} ]"
 [ -z "${SEMVER}" ] && return 1
@@ -624,14 +628,14 @@ else
   echo "INFO! *CURRENT_SEMVER* - ${SEMVER} not equal to *LATEST_TAG* - ${LATEST_TAG}"
 fi
 
-
-lastTaggedCommit=$( git rev-list --tags --max-count=1 )
-currentVersionString=$( git describe --tags ${lastTaggedCommit} )
-currentVersion=$(
-echo "$( git describe --tags ${lastTaggedCommit} )" |
-sed 's/v//'
-)
-echo "INFO! *currentVersion* [ ${currentVersion} ]"
+# lastTaggedCommi=$( git rev-list --tags --max-count=1 )
+# currentVersionString=$( git describe --tags ${lastTaggedCommit} )
+# currentVersion=$(
+# echo "$( git describe --tags ${lastTaggedCommit} )" |
+# sed 's/v//'
+# )
+# echo "INFO! *currentVersion* [ ${currentVersion} ]"
+# return
 #  LATEST_TAG is from the fetched taglist on gitub
 #  currentTag is the last tagged stagged commit
 #  

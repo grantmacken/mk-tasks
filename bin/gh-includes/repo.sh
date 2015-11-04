@@ -37,24 +37,25 @@ local baseName="$( echo "${fileName}" | cut -d. -f1 )"
 #local basePath="$( echo "${file}" | sed 's%fileName%%')"
 local headerDump="${GITHUB_DIR}/headers/${baseName}.txt"
 local eTagFile="${GITHUB_DIR}/etags/${baseName}.etag"
-
 local message=
 #repoRemoveFile "${file}"
 echo "TASK! from github, fetch and store reponse"
 echo "INFO! - *GET URL* : [ ${url} ]"
 echo "INFO! - *RESPONSE FILE* : [ ${fileName} ]"
-
 echo "INFO! - *fileName* : [ ${fileName} ]"
 echo "INFO! - *baseName* : [ ${baseName} ]"
 echo "INFO! - *headerDump* : [ ${headerDump} ]"
 echo "INFO! - *eTagFile* : [ ${eTagFile} ]"
-
 [ -n "${fileName}" ] ||  return 1
 [ -n "${url}" ] || return 1
 [ -n "${file}" ] || return 1
 
-
 #grep -oP '^ETag: \K["\w]+'
+
+if [ -e ${file} ] ;then
+   mv ${file} ${TEMP_DIR}/${fileName}
+fi
+
 if [ -e ${eTagFile} ] ;then
   local ETAG=$(<${eTagFile})
   echo "INFO! - *ETAG* : [ ${ETAG} ]"
@@ -86,11 +87,13 @@ case "${doRequest}" in
     echo "OK! response ${doRequest}. OK"
     echo "INFO! response *stored* as: [ ${fileName} ]"
     echo "$(<${headerDump})" | grep -oP '^ETag: "\K(\w)+' > ${eTagFile}
+    rm ${TEMP_DIR}/${fileName}
     return 0
   ;;
   304)
     echo "OK! response ${doRequest}. OK"
     echo "INFO! ${fileName} is already up to date so will not be modified]"
+    mv ${TEMP_DIR}/${fileName} ${file}
     return 0
   ;;
   *)
@@ -119,9 +122,6 @@ echo "${jsn}"
 [ -n "${url}" ] || return 1
 [ -n "${file}" ] || return 1
 [ -n "${jsn}" ] || return 1
-
-
-
 doRequest=$(
 curl -s \
 -H "Accept: application/json" \

@@ -17,15 +17,6 @@ ANALYZE_CSS  :=  $(LOG_DIR)/analyze-css.json
 CSS_STORED_LOG :=   $(LOG_DIR)/css-stored.log 
 CSS_UPLOADED_LOG :=   $(LOG_DIR)/css-uploaded.log 
 
-getMimeType = $(shell node -pe "\
- fs = require('fs');\
- re = /$1/;\
- n = require('cheerio').load(fs.readFileSync('$(EXIST_HOME)/mime-types.xml'),\
- { normalizeWhitespace: true, xmlMode: true});\
- n('extensions').filter(function(i, el){\
- return re.test(n(this).text());\
- }).parent().attr('name');\
-")
 
 #############################################################
 styles: $(OUT_STYLES)

@@ -34,10 +34,10 @@ if [ -d ${IMPORTS} ];then
     done
  else
     echo "ERR!:  link to imports not set up yet"
-	exit 1
+    exit 1
 fi
 ###################################
-while getopts "h r l" OPTION
+while getopts "h r v l" OPTION
 do
   case $OPTION in
     h)
@@ -48,7 +48,11 @@ do
     l)
       if xqListAvailableQueries ; then
           exit 1
-      fi 
+      fi
+    ;;
+    v)
+      VERBOSE='verbose'
+      shift
     ;;
     r)
       HOST="$HOST_REMOTE"
@@ -57,13 +61,9 @@ do
     *)
   ;;
   esac
-done  
+done
 
-if [ -z "${HOST}" ] ; then
-  HOST="${HOST_LOCAL}"
-fi
-
-echo "INFO! - *HOST* [ ${HOST} ]"
+[ -z "${HOST}" ] && HOST="${HOST_LOCAL}"
 
 #echo "INFO! - *GIT_USER_NAME* [ ${GIT_USER} ]"
 #echo "INFO! - *GITHUB_ACCESS_TOKEN* [ ${GITHUB_ACCESS_TOKEN} ]"
@@ -83,8 +83,9 @@ queryFile=
 # simple
 # empty, boolean
 returns=
+response=
 
-declare -a ARGS
+declare -a ARGS                                      
 declare -a params
 
 if [ ! $ARGUMENTS -gt 0 ]; then
@@ -93,7 +94,7 @@ if [ ! $ARGUMENTS -gt 0 ]; then
 fi
 #echo "INFO! - *ARGUMENTS* [ ${ARGUMENTS} ]'
 QUERY=$1
-echo "#${QUERY}#"
+
 
 DBA_GROUP='dba'
 
@@ -103,25 +104,25 @@ KNOWN_PASS="${GITHUB_ACCESS_TOKEN}"
 APP_PATH="apps/${REPO_NAME}"
 #echo "INFO! - *KNOWN_USER* [ ${KNOWN_USER} ]"
 #echo "INFO! - *KNOWN_PASS* [ ${KNOWN_PASS} ]"
-echo "INFO! - *HOST* [ ${HOST} ]"
-echo "INFO! - *QUERY*: [ ${QUERY} ]"
-
-echo "INFO! - *APP_PATH*: [ ${APP_PATH} ]"
+[ -n "${VERBOSE}" ]  && echo "#${QUERY}#"
+[ -n "${VERBOSE}" ]  && echo "INFO! - *HOST* [ ${HOST} ]"
+[ -n "${VERBOSE}" ]  && echo "INFO! - *QUERY*: [ ${QUERY} ]"
+[ -n "${VERBOSE}" ]  && echo "INFO! - *APP_PATH*: [ ${APP_PATH} ]"
 # if we have a extended query or a interpolation heredoc
 # then create the query from the
 if [ $ARGUMENTS -eq 1 ]; then
   if [ -e "bin/queries/${QUERY}.xq" ] ; then
-	queryFile="bin/queries/${QUERY}.xq"
-	query=$(<${queryFile})
+    queryFile="bin/queries/${QUERY}.xq"
+    query=$(<${queryFile})
   fi
   ARGS=()
 else
   shift
   ARGS=("$@")
-  echo "INFO! - *ARGS* [ ${ARGS[@]} ]" 
+ [ -n "${VERBOSE}" ]  && echo "INFO! - *ARGS* [ ${ARGS[@]} ]"
   # when we want to interpolate useing a heredoc
 #  if [ -e "$(BIN_DIR)/query/${QUERY}.sh" ] ; then
-#	chmod +x "$(BIN_DIR)/query/${QUERY}.sh"
+#   chmod +x "$(BIN_DIR)/query/${QUERY}.sh"
 #  fi
 fi
 
@@ -130,13 +131,13 @@ fi
 # the list of available queries
 # each query should have
 # params() list of expected args
-# the query, will be either 
-# 	a string, from a file or generated from a here doc
+# the query, will be either
+#   a string, from a file or generated from a here doc
 # returns what gets returned will be either a
-# 	boolean, string, etc
+#   boolean, string, etc
 
 ##<status result="ok"/>
-  
+
 case "$QUERY" in
 #LIST-START#
   log)
@@ -207,8 +208,32 @@ case "$QUERY" in
   query="util:binary-doc-available('${route}')"
   returns='string'
   ;;
+  app-semver)
+  params=()
+  route="${APP_PATH}/expath-pkg.xml"
+  query="doc('${route}')/*/@version/string()"
+  returns='string'
+  ;;
+  repo-remove)
+  params=( )
+  [ -z ${REPO_NAME} ] && exit
+  [ -n "${VERBOSE}" ]  && echo "${REPO_NAME}"
+  query="repo:remove('${REPO_NAME}')"
+  returns='boolean'
+  ;;
+  repo-undeploy )
+  params=( )
+  [ -z ${REPO_NAME} ] && exit
+  [ -n "${VERBOSE}" ]  && echo "${REPO_NAME}"
+  query="repo:undeploy('${REPO_NAME}')"
+  returns='repo-status'
+  ;;
   install-and-deploy)
   params=( )
+  [ -z ${ASSET_BROWSER_DOWNLOAD_URL} ] && exit
+  [ -z ${REPO_NAME} ] && exit
+  [ -n "${VERBOSE}" ]  && echo "${REPO_NAME}"
+  [ -n "${VERBOSE}" ]  && echo "${ASSET_BROWSER_DOWNLOAD_URL}"
   query="repo:install-and-deploy('${REPO_NAME}', '${ASSET_BROWSER_DOWNLOAD_URL}')"
   returns='repo-status'
   ;;
@@ -229,11 +254,11 @@ case "$QUERY" in
   params=(path)
   path=$1
   collection="data/${REPO_NAME}"
-	echo ${path}
-	echo ${DATA_DIR}
+    echo ${path}
+    echo ${DATA_DIR}
   directory="${CWD}/${DATA_DIR}"
-  pattern=$( echo "${path}" | sed "s%^${DATA_DIR}/%%" ) 
-	log=$( echo "${path}" | grep -oP "^${DATA_DIR}/\K(\w)+" )
+  pattern=$( echo "${path}" | sed "s%^${DATA_DIR}/%%" )
+    log=$( echo "${path}" | grep -oP "^${DATA_DIR}/\K(\w)+" )
   echo "collection: [ $collection ]"
   echo "directory: [ $directory ]"
   echo "pattern: [ $pattern ]"
@@ -348,7 +373,7 @@ case "$QUERY" in
   query="sm:passwd('$1', '$2')"
   returns='empty'
   ;;
-#LIST-END# 
+#LIST-END#
  *)
    echo "FAILURE! *no  query* named ${QUERY}"
    xqUsage
@@ -398,31 +423,31 @@ fi
 if ! existPost ; then
   echo "INFO! *not* OK response "
     case "$returns" in
-	boolean)
-	echo "INFO! - *RESPONSE*: [ false ]"
-	response=$(
-	  echo $(<${TEMP_XML}) |
-	  cheerio message |
-	  grep -oP 'ERROR\s+\K(.+)(?=\[)'
-	  )
-	echo "INFO! - *RESPONSE*: [ ${response} ]"
-	exit 1
-	;;
-	*)
-	response=$(
-	  echo $(<${TEMP_XML}) |
-	  cheerio message |
-	  grep -oP 'ERROR\s+\K(.+)(?=\[)'
-	  )	
+    boolean)
+    echo "INFO! - *RESPONSE*: [ false ]"
+    response=$(
+      echo $(<${TEMP_XML}) |
+      cheerio message |
+      grep -oP 'ERROR\s+\K(.+)(?=\[)'
+      )
+    echo "INFO! - *RESPONSE*: [ ${response} ]"
+    exit 1
+    ;;
+    *)
+    response=$(
+      echo $(<${TEMP_XML}) |
+      cheerio message |
+      grep -oP 'ERROR\s+\K(.+)(?=\[)'
+      )
     if [ -n "${response}" ] ; then
-	  echo "INFO! - *RESPONSE*: [ ${response} ]"
-	else
-	  echo "$(<${TEMP_XML})"
-	fi
-	
-	echo "INFO! - *RESPONSE*: [ HTTP ERROR CODE TODO ]"
-	exit 1
-	;;
+      echo "INFO! - *RESPONSE*: [ ${response} ]"
+    else
+      echo "$(<${TEMP_XML})"
+    fi
+
+    echo "INFO! - *RESPONSE*: [ HTTP ERROR CODE TODO ]"
+    exit 1
+    ;;
   esac
 fi
 
@@ -430,15 +455,21 @@ fi
 #if [ -e "$(BIN_DIR)/response/${QUERY}.sh" ] ; then
 #  chmod +x "$(BIN_DIR)/response/${QUERY}.sh"
 #  $(BIN_DIR)/response/${QUERY}.sh
-#fi
+#fi                                    
+[ -n "${VERBOSE}" ]  && \
+echo "-------------------------------------------------------------------------"
+[ -n "${VERBOSE}" ]  && \
+echo $(<${TEMP_XML})
+[ -n "${VERBOSE}" ]  && \
+echo "-------------------------------------------------------------------------"
 
 case "$returns" in
   boolean)
   response=$(
-	echo $(<${TEMP_XML}) |
-	cheerio exist\\:value
-	)
-  echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+    echo $(<${TEMP_XML}) |
+    cheerio exist\\:value
+    )
+  [ -n "${VERBOSE}" ]  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
   ;;
   empty)
   echo "OK! - empty response expected"
@@ -449,7 +480,8 @@ case "$returns" in
     echo $(<${TEMP_XML}) |
     cheerio exist\\:value
     )
-  echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+  [ -n "${VERBOSE}" ]  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+  echo "$response" > ${STRING_RESPONSE} 
   ;;
   stored_log)
   response=$(
@@ -470,9 +502,9 @@ case "$returns" in
   ;;
   uploaded_log)
   response=$(
-	echo $(<${TEMP_XML}) |
-	cheerio exist\\:value
-	)
+    echo $(<${TEMP_XML}) |
+    cheerio exist\\:value
+    )
   echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
   case "$log" in
     archive)
@@ -485,13 +517,12 @@ case "$returns" in
     ;;
   esac
   ;;
-  
   list)
   response=$(
-	echo $(<${TEMP_XML}) |
-	cheerio exist\\:value
-	)
-  responseList=(${response})
+    echo $(<${TEMP_XML}) |
+    cheerio exist\\:value
+    )
+ responseList=(${response})
   listLength=${#responseList[@]}
   for i in ${!responseList[@]}; do
     printf "%d) %s\n"  $((i+1))  "${responseList[i]}"
@@ -500,16 +531,15 @@ case "$returns" in
   ;;
   element-status)
   response=$(
-	echo $(<${TEMP_XML}) |
-	cheerio status
-	)
+    echo $(<${TEMP_XML}) | grep -oP 'result="\K\w+'
+    )
   echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
   ;;
   repo-status)
   response=$(
-	echo $(<${TEMP_XML}) |
-	cheerio .result
-	)
+    echo $(<${TEMP_XML}) |
+    cheerio .result
+    )
   echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
   ;;
   *)
@@ -517,6 +547,6 @@ case "$returns" in
   exit 1
 esac
 
-
+echo ${response}
 exit 0
 
