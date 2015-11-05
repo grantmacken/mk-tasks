@@ -36,9 +36,9 @@ associated with a simple *milestone* release strategy
 
 TODO! not yet happy with 3
 
-Dont push until ready for a pull request
+Don't push until ready for a pull request
     - `git commit -am ''` combined changes into commit
-    - `git rebase -i @{u}
+    - `git rebase -i @{u
 
  notes: if I am the only person working on the branch there is no need to
  `git pull --rebase` otherwise ...

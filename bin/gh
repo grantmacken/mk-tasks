@@ -545,7 +545,7 @@ EOF
   requestURL="${PR_URL}/merge"
   outFile="${JSN_MERGE}"
   expectResponse=200
-  #thenDo='merged-pull-request'
+  thenDo='merged-pull-request'
   ;;
   parse-merged)
   params=( )
@@ -556,7 +556,7 @@ EOF
   params=( )
   gh 'get-current-pull-request' || exit
   parsePullRequest > /dev/null
-  # mergedPullRequest
+  mergedPullRequest
   exit
   ;;
   get-pr-lists)
@@ -794,7 +794,7 @@ EOF
   # parseTags > /dev/null
   # parseIssueMD > /dev/null
   # parseFetchedIssue > /dev/null
-  # parseLatestRelease > /dev/null
+  parseLatestRelease > /dev/null
   # omPriorReleaseConditions
   SEMVER="$(<${SEMVER_FILE})"
   parsePullRequest > /dev/null
@@ -908,12 +908,6 @@ case "$method" in
       echo "INFO! thenDo ${thenDo}"
       gh "${thenDo}"
     fi
-    #if [ -n "$GET_COLLECTION" ] ; then
-    #  gh "$GET_COLLECTION"
-    #fi
-    #if [ -n "${COLLECTION_NAME}" ] ; then
-    #  [ ! -d "${GITHUB_DIR}/${COLLECTION_NAME}" ] &&  mkdir ${GITHUB_DIR}/${COLLECTION_NAME}
-    #fi
 	exit 0
   else
 	exit 1

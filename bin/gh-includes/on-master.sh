@@ -606,11 +606,13 @@ omUpdateSemver(){
 [ -z "${PR_MILESTONE_TITLE}" ] && parsePullRequest 
 [ -z "${FETCHED_ISSUE_MILESTONE_TITLE}" ] && parseFetchedIssue
 [ -z "${currentVersion}" ] && \
-    currentVersion="$( xq app-semver  | sed 's/v//' )"
+    currentVersion="$( xq -r app-semver  | sed 's/v//' )"
 
 echo "INFO! *SEMVER* [ ${SEMVER} ]"
 echo "INFO! *LATEST_TAG* [ ${LATEST_TAG} ]"
-echo "INFO! *INSTALLED_VERSION* [ ${INSTALLED_VERSION} ]"
+echo "INFO! *REMOTE_DEPLOYED_VERSION* [ ${currentVersion} ]"
+echo "INFO! *LOCAL_DEPLOYED_VERSION* [ $( xq app-semver | sed 's/v//') ]"
+
 echo "INFO! *PR_MILESTONE_TITLE* [ ${PR_MILESTONE_TITLE} ]"
 echo "INFO! *FETCHED_ISSUE_MILESTONE_TITLE* [ ${FETCHED_ISSUE_MILESTONE_TITLE} ]"
 [ -z "${SEMVER}" ] && return 1
@@ -627,7 +629,7 @@ if [ "${SEMVER}" = "${LATEST_TAG}" ] ; then
 else
   echo "INFO! *CURRENT_SEMVER* - ${SEMVER} not equal to *LATEST_TAG* - ${LATEST_TAG}"
 fi
-
+# git tag -l | xargs git tag -d && git fetch -t
 # lastTaggedCommi=$( git rev-list --tags --max-count=1 )
 # currentVersionString=$( git describe --tags ${lastTaggedCommit} )
 # currentVersion=$(

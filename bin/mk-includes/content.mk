@@ -80,7 +80,7 @@ OUT_POSTS :=  $(TEMP_FM_ARTICLE_POSTS) $(TEMP_MD_ARTICLE_POSTS) $(OUT_DATA_POSTS
 
 content: $(OUT_POSTS) $(OUT_PAGES)
 
-watch-pages:
+watch-content:
 	@watch -q $(MAKE) content
 
 .PHONY: postr  watch-content

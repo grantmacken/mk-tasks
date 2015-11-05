@@ -117,7 +117,7 @@ echo "TASK! post json to url and store json response"
 echo "INFO! - *POST URL* : [ ${url} ]"
 echo "INFO! - *RESPONSE FILE* : [ ${file} ]"
 echo "INFO! json payload to send"
-echo "${jsn}"
+echo "${jsn}" |  jq '.'
 [ -n "${fileName}" ] ||  return 1
 [ -n "${url}" ] || return 1
 [ -n "${file}" ] || return 1
