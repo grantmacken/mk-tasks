@@ -20,7 +20,8 @@
     "postcss-cli": "latest",
     "postcss": "latest",
     "autoprefixer": "latest",
-    "postcss-import": "latest",
+    "cssnext": "latest",
+    "cssnano-cli": "latest",
     "postcss-assets": "latest"
   }
 }

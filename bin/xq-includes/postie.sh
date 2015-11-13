@@ -3,7 +3,6 @@ function existGET(){
 if [ -e  ${TEMP_XML} ] ; then
  rm ${TEMP_XML}
 fi
-
 url="http://${HOST}:8080/exist/rest${remotePath}"
 echo "TASK! put xml to remote"
 echo "INFO! - *GET URL* : [ ${url} ]"

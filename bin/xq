@@ -85,7 +85,7 @@ queryFile=
 returns=
 response=
 
-declare -a ARGS                                      
+declare -a ARGS
 declare -a params
 
 if [ ! $ARGUMENTS -gt 0 ]; then
@@ -94,13 +94,9 @@ if [ ! $ARGUMENTS -gt 0 ]; then
 fi
 #echo "INFO! - *ARGUMENTS* [ ${ARGUMENTS} ]'
 QUERY=$1
-
-
 DBA_GROUP='dba'
-
 KNOWN_USER="${GIT_USER}"
 KNOWN_PASS="${GITHUB_ACCESS_TOKEN}"
-
 APP_PATH="apps/${REPO_NAME}"
 #echo "INFO! - *KNOWN_USER* [ ${KNOWN_USER} ]"
 #echo "INFO! - *KNOWN_PASS* [ ${KNOWN_PASS} ]"
@@ -126,8 +122,6 @@ else
 #  fi
 fi
 
-
-
 # the list of available queries
 # each query should have
 # params() list of expected args
@@ -140,10 +134,15 @@ fi
 
 case "$QUERY" in
 #LIST-START#
+  exec)
+  params=( )
+  query="(process:execute(('dig','+short', 'gmack.nz'), <options/>))"
+  returns='stdout'
+  ;;
   log)
   params=( )
-  query="(util:log-app('info', 'gmack', 'hi'))"
-  returns='string'
+  query="(util:log-system-out('this is a system-out log message'))"
+  returns='journal_log'
   ;;
   put-stored-post)
   params=( )
@@ -245,20 +244,29 @@ case "$QUERY" in
   "
   returns='string'
   ;;
-  store-app-data)
-  params=(route)
-  query="xmldb:store-files-from-pattern('data/${REPO_NAME}','${CWD}/data','${1}','application/xml', true())"
-  returns='string'
+  store-built-resource) 
+  params=(route directory pattern mime_type log)
+  route=${1}    
+  directory=${2}    
+  pattern=${3}    
+  mime_type=${4}
+  log=${5}
+  echo "route: [ $route ]"
+  echo "directory: [ $directory ]"
+  echo "pattern: [ $pattern ]"
+  echo "log: [ $log ]"
+  query="xmldb:store-files-from-pattern('${route}','${directory}','${pattern}','$mime_type', true())"
+  returns='stored_log'
   ;;
-  store-build-content)
+  store-all-build-content)
   params=(path)
   path=$1
   collection="data/${REPO_NAME}"
-    echo ${path}
-    echo ${DATA_DIR}
+  echo ${path}
+  echo ${DATA_DIR}
   directory="${CWD}/${DATA_DIR}"
   pattern=$( echo "${path}" | sed "s%^${DATA_DIR}/%%" )
-    log=$( echo "${path}" | grep -oP "^${DATA_DIR}/\K(\w)+" )
+  log=$( echo "${path}" | grep -oP "^${DATA_DIR}/\K(\w)+" )
   echo "collection: [ $collection ]"
   echo "directory: [ $directory ]"
   echo "pattern: [ $pattern ]"
@@ -266,7 +274,7 @@ case "$QUERY" in
   query="xmldb:store-files-from-pattern('${collection}','${directory}','${pattern}','application/xml', true())"
   returns='stored_log'
   ;;
-  store-app-data-file)
+  store-built-content)
   params=(path)
   path=$1
   collection="data/${REPO_NAME}"
@@ -306,6 +314,10 @@ case "$QUERY" in
   ;;
   store-files-from-pattern)
   params=(route directory pattern mime_type)
+  route=${1}    
+  directory=${2}    
+  pattern=${3}    
+  mime_type=${4}
   query="(if(\
   xmldb:collection-available('apps/${REPO_NAME}/${1}') ) then (\
   ) else (xmldb:create-collection('apps/${REPO_NAME}', '${1}')),\
@@ -367,6 +379,11 @@ case "$QUERY" in
   KNOWN_PASS="$2"
   query="sm:passwd('${GIT_USER}', '${GITHUB_ACCESS_TOKEN}')"
   returns='empty'
+  ;;
+  is-authenticated)
+  params=( )
+  query="sm:is-authenticated()"
+  returns='boolean'
   ;;
   set-password)
   params=(username password)
@@ -455,7 +472,7 @@ fi
 #if [ -e "$(BIN_DIR)/response/${QUERY}.sh" ] ; then
 #  chmod +x "$(BIN_DIR)/response/${QUERY}.sh"
 #  $(BIN_DIR)/response/${QUERY}.sh
-#fi                                    
+#fi
 [ -n "${VERBOSE}" ]  && \
 echo "-------------------------------------------------------------------------"
 [ -n "${VERBOSE}" ]  && \
@@ -481,7 +498,19 @@ case "$returns" in
     cheerio exist\\:value
     )
   [ -n "${VERBOSE}" ]  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
-  echo "$response" > ${STRING_RESPONSE} 
+  echo "$response" > ${STRING_RESPONSE}
+  ;;
+  stdout)
+  response=$(
+  node -pe "\
+  n = require('cheerio').load('$(echo $(<${TEMP_XML}))');\
+  n('stdout').text();"
+  )
+  [ -n "${VERBOSE}" ]  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+  echo "$response" > ${STRING_RESPONSE}
+  ;;
+  journal_log)
+    echo "$( journalctl -n 1 -o cat -u exist | grep -oP '\)\K.+')"
   ;;
   stored_log)
   response=$(
@@ -489,16 +518,9 @@ case "$returns" in
     cheerio exist\\:value
     )
   echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
-  case "$log" in
-    archive)
-    [ ! -e ${POSTS_STORED_LOG} ] && touch ${POSTS_STORED_LOG}
-    [ -n "${response}" ] && echo "${path} ${response}" >> ${POSTS_STORED_LOG}
-    ;;
-    pages)
-    [ ! -e ${PAGES_STORED_LOG} ] && touch ${PAGES_STORED_LOG}
-    [ -n "${response}" ] && echo "${path} ${response}" >> ${PAGES_STORED_LOG}
-    ;;
-  esac
+  stored_log=${LOG_DIR}/${log}.log
+  [ ! -e ${stored_log} ] && touch ${stored_log}
+  [ -n "${response}" ] && echo "${response}" >> ${stored_log}
   ;;
   uploaded_log)
   response=$(

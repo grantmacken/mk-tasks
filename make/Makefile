@@ -3,8 +3,8 @@ include ../common.properties
 SHELL=/bin/bash
 #SHELL += -x
 #SHELL := $(SHELL) -e
-#export PATH := $(abspath $(NODE_BIN_DIR))/:$(PATH)
-#export PATH := $(abspath $(BIN_DIR))/:$(PATH)
+export PATH := $(abspath $(NODE_BIN_DIR))/:$(PATH)
+export PATH := $(abspath $(BIN_DIR))/:$(PATH)
 
 #CURRENT_MAKEFILE := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 #MAKEFILE_DIRECTORY := $(dir $(CURRENT_MAKEFILE))
@@ -112,24 +112,22 @@ tmx:
 #	@echo 'ISSUE_STATE $(ISSUE_STATE)'
 #endif
 #
-POSTS := $(OUT_POSTS)
-PAGES := $(OUT_PAGES)
-STYLES := $(OUT_STYLES)
+STYLES := $(store-css)
 SCRIPTS := $(JS_SCRIPTS)
 ICONS := $(ICONS_MAIN)
 
 #$(POSTS) $(PAGES)  $(SCRIPTS) $(ICONS)
-www: $(STYLES) $(PAGES)
-#
-watch-www:
-	@watch -q $(MAKE) www
+assets: $(STYLES)
 
-all: $(BUILD_XQUERY_MODULES) $(BUILD_HTML_TEMPLATES)
+site: $(BUILD_XQUERY_MODULES) $(BUILD_HTML_TEMPLATES)
 
-watch-all:
-	@watch -q $(MAKE)
+watch-site:
+	@watch -q $(MAKE) site
 
-.PHONY:  watch-www tmx help
+watch-assets:
+	@watch -q $(MAKE) assets
+
+.PHONY:  watch-site  tmx help
 
 
 test:

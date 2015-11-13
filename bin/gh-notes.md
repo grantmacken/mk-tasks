@@ -63,9 +63,26 @@ Don't push until ready for a pull request
 
 6. use github api to create a merge into master
     - `gh merge-pull-request`
-    - `gh merged-pull-request`
         1. merge message based on ISSUE.md
         2. checkout master - pull --rebase
         3. delete associated local branch and remote tracked branch`
 
-7. update semver
+7. update semver and build
+    - `gh update-semver`
+        1. get for the remotely deployed version on eXist
+        2. update semver based on milestone strategy
+        3. touch config and force build based on semver
+        4. build release asset is xar
+
+8. release and release asset
+    - `gh release`
+    - `gh get-latest-release`
+    - `gh parse-latest-release`
+    - `gh create-release-asset`  
+        1. upload xar as release artifact
+        2. returns asset_uploaded.json
+
+9. deploy 
+    - `xq install-and-deploy`
+        i. local deployment
+    - `xq -r install-and-deploy`
