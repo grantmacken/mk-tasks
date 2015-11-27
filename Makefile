@@ -2,7 +2,8 @@ SHELL=/bin/bash
 
 gmack :=  $(abspath ../gmack.nz)
 WEB_PROJECTS := $(gmack)
-UP_TARG_DIR := $(abspath ../ )
+UP_TARG_DIR := $(abspath ../ )  
+
 define ensure-exec
 	@echo 'ensure executable'
 	@chmod +x $(1)
@@ -28,4 +29,5 @@ clean:
 	stow -D -t $(gmack) make
 
 install:
-	@cd  $(UP_TARG_DIR) && npm install
+	@echo "link stuff that needs to be linked"  
+	@echo $(UP_TARG_DIR)

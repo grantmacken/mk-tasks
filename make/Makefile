@@ -130,5 +130,5 @@ watch-assets:
 .PHONY:  watch-site  tmx help
 
 
-test:
+ test:
 	@prove

@@ -680,10 +680,10 @@ if [ ${CURRENT_BRANCH} = 'master' ] ; then
   #The --prune option removes remote-tracking branches that no longer exist on the
   doTask=$( git pull --prune )
   echo "DONE! ${doTask}"
-  echo "TASK! delete local branch: ${CURRENT_BRANCH}"
+  echo "TASK! delete local branch: ${PR_HEAD_REF}"
   doTask=$(git branch -D ${PR_HEAD_REF})
   echo "DONE! ${doTask}"
-  echo "TASK! delete remote branch ${CURRENT_BRANCH}"
+  echo "TASK! delete remote branch ${PR_HEAD_REF}"
   doTask=$(git push origin --delete ${PR_HEAD_REF})
   echo "DONE! ${doTask}"
   # echo "TASK! delete issue and associated pull-request files"

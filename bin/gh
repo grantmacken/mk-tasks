@@ -532,15 +532,15 @@ EOF
   merge-pull-request)
   params=( )
   gh 'get-current-pull-request' || exit
-  gh 'get-pr-combined-status' || exit
-  gh 'get-pr-commits' || exit
+  # gh 'get-pr-combined-status' || exit
+  # gh 'get-pr-commits' || exit
   parsePullRequest > /dev/null
-  parseCombinedStatus > /dev/null
-  prPriorMerge || exit
+  # parseCombinedStatus > /dev/null
+  # prPriorMerge || exit
   #parsePullRequest
-  commitMessage="pull request merged #${PR_NUMBER} title - ${PR_TITLE}"
+  commitMessage="pull request merged #${PR_NUMBER}\ntitle - ${PR_TITLE}"
   jsn="{\"commit_message\":\"${commitMessage}\", \"sha\":\"${PR_HEAD_SHA}\"}"
-  echo "$jsn" | R -p 'id'
+  echo "$jsn" | xq '.'
   method='PUT'        
   requestURL="${PR_URL}/merge"
   outFile="${JSN_MERGE}"
@@ -590,7 +590,7 @@ EOF
   list-pr-comments)
   params=( )
   jsnPR_COMMENTS=$(<${JSN_PR_COMMENTS})
-  echo "${jsnPR_COMMENTS}" | R  'project [\id \body ]'  -o table
+  echo $(<${JSN_PR_COMMENTS}) | jq -r '["id", "body"],(.[] | [.id, .body]) | @sh' 
   exit
   ;;
   get-pr-comment)
@@ -709,15 +709,25 @@ EOF
   echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
   method='POST'
   requestURL="${PR_STATUSES_URL}"
-  outFile="${JSN_PR_STATUSES}"
+  outFile="${JSN_PR_STATUS}"
   jsn="{\"state\":\"success\",\"description\":\"All good\",\"context\":\"default\"}"
   expectResponse=201
   ;;
   parse-pr-statuses)
   params=( )
   parsePullRequest  > /dev/null
+  parseFetchedIssue  > /dev/null
+  parseBranchName  > /dev/null
+  parseIssueMD > /dev/null
+  echo "INFO! - *PR_TITLE*: [ ${PR_TITLE} ]"
   echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
-  echo "$(<${JSN_PR_STATUSES})" | R  'project [\id \state \context \description ]'  -o table
+  echo "INFO! - *PR_NUMBER*: [ ${PR_NUMBER} ]"
+  echo "INFO! - *FETCHED_ISSUE_NUMBER*: [ ${FETCHED_ISSUE_NUMBER} ]"
+  echo "INFO! - *PARSED_ISSUE_NUMBER*: [ ${PARSED_ISSUE_NUMBER} ]"
+  echo "INFO! - *PARSED_ISSUE_NUMBER*: [ ${PARSED_ISSUE_NUMBER} ]"
+  echo "$(<${JSN_PR_STATUSES})" | \
+  jq -r '["id", "state", "context", "description" ],(.[] | [.id, .state, .context, .description]) | @sh' 
+  # echo "$(<${JSN_PR_STATUSES})" | jq  'project [\id \state \context \description ]'  -o table
   exit
   ;;
 # TAGS
@@ -785,30 +795,6 @@ EOF
   update-semver)
   params=( )
   omUpdateSemver
-  touch config               
-  make build
-  exit
-  ;;
-  release)
-  params=( )
-  # parseTags > /dev/null
-  # parseIssueMD > /dev/null
-  # parseFetchedIssue > /dev/null
-  parseLatestRelease > /dev/null
-  # omPriorReleaseConditions
-  SEMVER="$(<${SEMVER_FILE})"
-  parsePullRequest > /dev/null
-  bodyTxt="${PR_MILESTONE_TITLE} merged into master \n - ${PR_TITLE}"
-  nameTxt="${ABBREV}-${SEMVER}"
-  tagNameTxt="${SEMVER}"
-  echo "INFO! *body* [ ${bodyTxt} ] "
-  echo "INFO! *tag_name* [ ${tagNameTxt} ] "
-  echo "INFO! *name* [ ${nameTxt} ] "
-  gh create-release "${tagNameTxt}" "${nameTxt}" "${bodyTxt}"
-  exit
-  gh get-latest-release
-  gh parse-latest-release
-  gh create-release-asset
   exit
   ;;
   create-release)
@@ -817,7 +803,7 @@ EOF
   requestURL="${REPO_RELEASES_URL}"
   outFile="${JSN_RELEASE}"
   jsn="{\"tag_name\":\"${1}\",\"target_commitish\":\"master\",\"name\":\"${2}\",\"body\":\"${3}\",\"draft\":false,\"prerelease\":false}"
-  echo "${jsn}" | R -p 'id'
+  echo "${jsn}" | jq '.'
   expectResponse=201
   ;;             
 	# 
@@ -835,17 +821,15 @@ EOF
   exit
   ;;
 #RELEASE ASSETS
-  create-release-asset)
-  params=( )
-  parseLatestRelease
+  upload-release-asset)
+  params=( uploadFile uploadURL contentType )
   method='UPLOAD'
-  upFile="pkg/xar/${RELEASE_NAME}.xar"
+  upFile="${1}"
+  requestURL="${2}"
+  contentType="${3}"
   [ -e $upFile ]  || exit
-  requestURL="${RELEASE_UPLOAD_URL}?name=${RELEASE_NAME}.xar"
   outFile="${JSN_ASSET_UPLOADED}"
-  contentType='application/zip'
   expectResponse=201
-  # echo "INFO! *RELEASE_ASSET* [ ${upFile} ] "
   ;;
   parse-asset-uploaded)
   parseAssetUploaded
@@ -864,6 +848,39 @@ EOF
   requestURL="${REPO_RELEASES_URL}/assets/${1}"
   expectResponse=204
   outFile=
+  ;;
+#DEPLOYMENTS
+#https://developer.github.com/v3/repos/deployments
+  get-deployments)
+  params=( )
+  method='GET'           
+  echo "${REPO_URL}"
+  requestURL="${REPO_URL}/deployments"
+  expectResponse=200
+  outFile="${JSN_DEPLOYMENTS}"
+  ;;
+  create-deployment)
+  params=( tag_name )
+  method='POST'           
+  requestURL="${REPO_URL}/deployments"
+  jsn="{\"ref\":\"${1}\",\"task\":\"deploy\",\"enviroment\":\"local\",\"description\":\"local development enviroment\"}"
+  expectResponse=201
+  outFile="${JSN_DEPLOYMENT}"
+  ;;
+  create-deployment-status)
+  params=( id state )
+  method='POST'           
+  requestURL="${REPO_URL}/deployments/${1}/statuses"
+  jsn="{\"state\":\"${2}\",\"target_url\":\"${WEBSITE}\",\"description\":\"app deployed\"}"
+  expectResponse=201
+  outFile="${JSN_DEPLOYMENT_STATUS}"
+  ;;
+  get-deployment-statuses)
+  params=( id )
+  method='GET'           
+  requestURL="${REPO_URL}/deployments/${1}/statuses"
+  expectResponse=200
+  outFile="${JSN_DEPLOYMENT_STATUSES}"
   ;;
 #LIST-END# 
  *)

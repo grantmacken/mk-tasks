@@ -420,18 +420,12 @@ if [ ! -e "${JSN_PR_COMBINED_STATUS}" ] ; then
 fi
 local jsnFile="$( parseIntoNodeFS ${JSN_PR_COMBINED_STATUS} )"
 nSTR="J = require('${jsnFile}');\
- R = require('ramda');\
- j = R.pick([\
- 'state'
- ],J);\
- state = 'PR_COMBINED_STATUS_STATE=' + R.prop('state',j);\
- print = function(x){console.log(x)};\
- R.forEach(print, [\
- state
- ]);\
+  console.log('PR_COMBINED_STATUS_STATE=' + J.state);\
+  console.log('PR_COMBINED_STATUS_TOTAL_COUNT=' + J.total_count);\
 "
 source <(node -e "${nSTR}")
 echo "INFO! - *PR_COMBINED_STATUS_STATE*: [ ${PR_COMBINED_STATUS_STATE} ]"
+echo "INFO! - *PR_COMBINED_STATUS_TOTAL_COUNT*: [ ${PR_COMBINED_STATUS_TOTAL_COUNT} ]"
 }
 
 function parseRelease(){
