@@ -39,8 +39,9 @@ if [ -d ${imports} ];then
   echo "ERR!:  link to imports not set up yet"
   exit 1
 fi
+verbose=false
 options=()
-while getopts "h r l v" OPTION
+while getopts "h l v" OPTION
 do
   case $OPTION in
     h)
@@ -53,17 +54,14 @@ do
           exit 0
       fi
     ;;
-    r)
-      HOST="$HOST_REMOTE"
+    v)
+    verbose=true
+    shift
     ;;
     *)
   ;;
   esac
 done  
-if [ -z "${HOST}" ] ; then
-  HOST="${HOST_LOCAL}"
-fi
-#echo "INFO! - *HOST* [ ${HOST} ]"
 
 ARGS_COUNT=$#
 REQUEST=
@@ -103,7 +101,7 @@ if [ $ARGS_COUNT -eq 1 ]; then
 else
   shift
   ARGS=("$@")
-  echo "INFO! - *ARGS* [ ${ARGS[@]} ]"
+  $verbose && echo "INFO! - *ARGS* [ ${ARGS[@]} ]"
   # when we want to interpolate useing a heredoc
   if [ -e "${BIN_DIR}/request/${REQUEST}.sh" ] ; then
 	chmod +x "${BIN_DIR}/request/${REQUEST}.sh"
@@ -174,22 +172,46 @@ case "$REQUEST" in
   ;;
   list-branches)
   params=( )
-  echo "$(<${JSN_BRANCHES})" | R  'project [\name]'  -o table
+  echo "$(<${JSN_BRANCHES})" | \
+  jq -r '["name"],(.[] | [.name]) | @sh' 
   exit
 	;;
   info-branch)
   branchInfo || exit
   exit
   ;;
+  get-branch)
+  params=( branch )
+  method='GET'
+  requestURL="${REPO_BRANCHES_URL}/${1}"
+  outFile="${JSN_BRANCH}"
+  ;;
+  create-branch-from-current-issue)
+  params=( )
+  $verbose && branchInfo
+  branchIsMaster ||  exit
+  BRANCH_SELECTED=$(
+  echo "$(<${JSN_ISSUE})" | \
+      jq -r -c '"\(.labels[0].name)-\(.number)-\(.title)"' | \
+      sed 's/\s/-/g'
+  )
+  $verbose  && echo "${BRANCH_SELECTED}"
+  parseBranchName "${BRANCH_SELECTED}" || exit
+  omCreateBranch || exit
+  method='GET'
+  requestURL="${REPO_BRANCHES_URL}/${BRANCH_SELECTED}"
+  outFile="${JSN_BRANCH}"
+  ;;
   create-branch-from-issue)
   params=( )
   branchInfo
+  exit
   branchIsMaster ||  exit
   parseIntoArrayIssuesForBranches || exit
   inputSelectIssueForBranch  || exit
   parseBranchName "${BRANCH_SELECTED}" || exit
   omCreateBranch || exit
-  gh 'get-current-issue'
+  # gh 'get-current-issue'
   exit
   ;;
   select-issue-for-branch)
@@ -332,22 +354,22 @@ case "$REQUEST" in
   ;;
   new-issue-md)
   params=( )
-  #gh get-issues
-  parseFetchedIssues  > /dev/null
-  omSetIssuesForBranches > /dev/null
+  #parseFetchedIssues
+  omSetIssuesForBranches
   omNewIssueMD
   exit
   ;;
   create-issue)
   params=( )
+  $verbose && echo "## $REQUEST ##"
   parseIssueMD > /dev/null
-  omSetJsonFromIssueMD 'jsn'
+  omSetJsonFromIssueMD 'jsn'       
   jsn=$(echo "${jsn}")
+  $verbose && echo "${jsn}" | jq '.'
   method='POST'
   requestURL="${REPO_ISSUES_URL}"
   outFile="${JSN_ISSUE}"
   expectResponse=201
-  thenDo='get-issues'
   ;;
   patch-issue)
   params=( )
@@ -360,18 +382,23 @@ case "$REQUEST" in
   requestURL="${REPO_ISSUES_URL}/${ISSUE_NUMBER}"
   outFile="${JSN_ISSUE}"
   expectResponse=200
-  thenDo='get-issues'
   ;;
   get-issues)
   params=( )
+  labels="$( echo "${ISSUE_BRANCH_TYPES[@]}" | tr ' ' ',' )"
+## note param is label not labels
+## https://developer.github.com/v3/issues/
+## if issues list gets to big use more filters e.g. state and since
+ URL="${REPO_ISSUES_URL}?state=open&label=${labels}"
   method='GET'
-  requestURL="${REPO_ISSUES_URL}"
-  outFile="${JSN_ISSUES}"
+  requestURL="${URL}"
+  outFile="${REPO_ISSUES_URL}"
   ;;
   list-issues)
   params=( )
-  jsnISSUES=$(<${JSN_ISSUES})
-  echo "${jsnISSUES}" | R  'project [\number \title \state ]'  -o table
+  echo "$(<${JSN_ISSUES})" | jq '.'
+  echo "$(<${JSN_ISSUES})" |\
+  jq -r '["number", "title", "milestone", "label"],(.[] | [.number, .title, .milestone.description, .labels[0].name ]) | @sh ' 
   exit
   ;;
   parse-issues)
@@ -385,6 +412,15 @@ case "$REQUEST" in
   baseURL="${REPO_ISSUES_URL}"
   requestURL="${baseURL}/${1}"
   outFile="${JSN_ISSUE}"
+  ;;
+  close-issue)
+  params=( number )
+  method=PATCH
+  baseURL="${REPO_ISSUES_URL}"
+  requestURL="${baseURL}/${1}"
+  expectResponse=204
+  outFile=
+  exi
   ;;
   get-current-issue)
   params=( )
@@ -499,11 +535,6 @@ EOF
   params=( )
   rm ${JSN_PULL_REQUEST}
   #TODO!
-  #method='GET'
-  #baseURL=$(node -pe "require('${GITHUB_REPO}')['pulls_url']" | sed -r 's/\{.+//g')
-  #requestURL="${baseURL}/${1}"
-  #outFile="${JSN_PULL_REQUEST}"
-  exit
   ;;
   parse-pull-request)
   params=( )
@@ -739,7 +770,7 @@ EOF
   params=( )
   method='GET'
   requestURL="${REPO_TAGS_URL}"
-  outFile="${GITHUB_TAGS}"
+  outFile="${JSN_TAGS}"
   ;;
   list-tags)
   params=( )
@@ -763,6 +794,12 @@ EOF
 #RELEASES
 # https://developer.github.com/changes/2013-09-25-releases-api/
 # https://developer.github.com/v3/repos/releases
+  get-release)
+  params=( tagname )
+  method='GET'
+  requestURL="${REPO_RELEASES_URL}/tags/$1"
+  outFile="${JSN_RELEASE}"
+  ;;
   get-releases)
   params=( )
   method='GET'
@@ -787,18 +824,13 @@ EOF
   parseLatestRelease
   exit
   ;;
-  list-releases)
-  jsnRELEASES="{REPO_RELEASES_URL}"
-  echo "${jsnRELEASES}" | jq -r -c '.[] | [ .tag_name , .name , .id ] '
-  exit
-  ;;
   update-semver)
-  params=( )
-  omUpdateSemver
+  params=( semver strategy )
+  omSemVer $1 $2
   exit
   ;;
   create-release)
-  params=(tag_name name body)
+  params=( tag_name name body)
   method='POST'
   requestURL="${REPO_RELEASES_URL}"
   outFile="${JSN_RELEASE}"
@@ -806,12 +838,20 @@ EOF
   echo "${jsn}" | jq '.'
   expectResponse=201
   ;;             
-	# 
   delete-release)
-  params=(releaseID)
+  params=( releaseID )
   method='DELETE'
   baseURL="${REPO_RELEASES_URL}"
   requestURL="${baseURL}/${1}"
+  expectResponse=204
+  outFile=
+  ;;
+  delete-latest-release)
+  params=( )
+  method='DELETE'
+  baseURL="${REPO_RELEASES_URL}"
+  releaseID="$(echo $(<${JSN_LATEST_RELEASE}) | jq '.id')"
+  requestURL="${baseURL}/${releaseID}"
   expectResponse=204
   outFile=
   ;;

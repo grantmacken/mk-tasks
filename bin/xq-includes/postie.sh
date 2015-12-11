@@ -99,12 +99,10 @@ else
 fi
 }
 
-
 function existPost(){
-[ -n "${VERBOSE}" ] && \
-echo 'TASK! POST QUERY'
+$verbose && echo 'TASK! POST QUERY'
+$verbose && echo "INFO! TEMP_OUT: ${TEMP_XML}"
 # echo ${query}
-# echo ${TEMP_XML}
 local POST=$(
 cat << EOF
 <query xmlns="http://exist.sourceforge.net/NS/exist" start="1" max="${max}">

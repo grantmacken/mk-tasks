@@ -15,17 +15,13 @@ function parseIntoNodeFS(){
 
 function parseBranchName(){
 #declare vars
-echo "$1"
+$verbose && echo 'Parse Branch Name'
 local branchName="${1}"
 if [ -z "${branchName}" ] ; then
  branchName="${CURRENT_BRANCH}"
 fi
-
-PARSED_ISSUE_LABEL=
-PARSED_ISSUE_NUMBER=
-PARSED_ISSUE_TITLE=
-echo "INFO! topic branch-name can be parsed into LABEL NUMBER TITLE"
-echo "INFO! *branch-name* [ ${branchName} ]"
+$verbose && echo "INFO! topic branch-name can be parsed into LABEL NUMBER TITLE"
+$verbose && echo "INFO! *branch-name* [ ${branchName} ]"
 PARSED_ISSUE_LABEL=$(
     echo  "${branchName}" |
     cut -d\- -f1
@@ -40,17 +36,17 @@ PARSED_ISSUE_TITLE=$(
     tr '-' ' '
     )
 #check if we can parse branch name
-local msg='can not parse branch name'   
+local msg='can not parse branch name'
 if [ -z "${PARSED_ISSUE_LABEL}" ] ; then
     echo "FAILURE! ${msg} - empty PARSED_ISSUE_LABEL "
     return 1
 else
     if [[ -n "$(echo "${PARSED_ISSUE_LABEL}" | grep -oP '^[a-z]{1,20}$' )" ]]
     then
-        echo "INFO! - *PARSED_ISSUE_LABEL*: [ ${PARSED_ISSUE_LABEL} ]"
+       $verbose &&  echo "INFO! - *PARSED_ISSUE_LABEL*: [ ${PARSED_ISSUE_LABEL} ]"
     else
         echo "FAILURE! ${msg} malformed PARSED_ISSUE_LABEL"
-       return 1 
+       return 1
     fi
 fi
 
@@ -60,19 +56,19 @@ if [ -z "${PARSED_ISSUE_NUMBER}" ] ; then
 else
     if [[ -n "$(echo "${PARSED_ISSUE_NUMBER}" | grep -oP '^[0-9]{1,5}$' )" ]]
     then
-         echo "INFO! - *PARSED_ISSUE_NUMBER*: [ ${PARSED_ISSUE_NUMBER} ]"
+        $verbose && echo "INFO! - *PARSED_ISSUE_NUMBER*: [ ${PARSED_ISSUE_NUMBER} ]"
     else
         echo "FAILURE! ${msg} : PARSED_ISSUE_NUMBER"
-       return 1 
-    fi 
+       return 1
+    fi
 fi
 
 if [ -z "${PARSED_ISSUE_TITLE}" ] ; then
     echo "FAILURE! ${msg} : PARSED_ISSUE_TITLE"
-    return 1  
+    return 1
 else
-     echo "INFO! - *PARSED_ISSUE_TITLE*: [ ${PARSED_ISSUE_TITLE} ]"
-fi 
+     $verbose && echo "INFO! - *PARSED_ISSUE_TITLE*: [ ${PARSED_ISSUE_TITLE} ]"
+fi
 }
 
 function parseTags(){
@@ -85,24 +81,20 @@ echo "INFO! - *LATEST_TAG*: [ ${LATEST_TAG} ]"
 }
 
 function parseFetchedIssues(){
-if [ ! -e "${JSN_ISSUES}" ] ; then
-  echo "FAILURE: file required ${JSN_ISSUES}"
-  return 1
-fi
+[ -e "${JSN_ISSUES}" ] || {
+echo "FAILURE: file required ${JSN_ISSUES}"
+return 1
+}
+local jsnFile="$(parseIntoNodeFS ${JSN_ISSUES})"
 #echo "TASK! get issues from github that can become branches"
 ## note param is label not labels
 ## https://developer.github.com/v3/issues/
 ## if issues list gets to big use more filters e.g. state and since
-#local URL="${REPO_ISSUES_URL}?label=${labels}"
-#repoFetch ${URL} ${GITHUB_ISSUES} || return 1
-ISSUES_COUNT=$(
- node -pe "J = require('${GITHUB_ISSUES}');\
- R = require('ramda');\
- R.length(J)"
- )
-echo "INFO! - *ISSUES_COUNT*: [ ${ISSUES_COUNT} ]"
+$verbose && echo $(<${JSN_ISSUES}) | jq '.'
+ISSUES_COUNT=$( node -e "require('${jsnFile}').length" )
+$verbose && echo "INFO! - *ISSUES_COUNT*: [ ${ISSUES_COUNT} ]"
 
-nSTR="J = require('$( parseIntoNodeFS ${JSN_ISSUES} )');\
+nSTR="J = require(${jsnFile});\
  R = require('ramda');\
  print = function(x){ ;\
  title = R.prop('title',x);\
@@ -118,7 +110,7 @@ nSTR="J = require('$( parseIntoNodeFS ${JSN_ISSUES} )');\
 };\
  console.log(R.toString(R.chain(print, J)))
 "
-node -e "${nSTR}" | R -o table 'project [\number \label \title \state \milestone_title]'
+node -e "${nSTR}"
 }
 
 
@@ -127,7 +119,8 @@ if [ ! -e "${JSN_ISSUES}" ] ; then
   echo "FAILURE: file required ${JSN_ISSUES}"
   return 1
 fi
-nSTR="J = require('${GITHUB_ISSUES}');\
+local jsnFile="$(parseIntoNodeFS ${JSN_ISSUES})"
+local nSTR="J = require(${jsnFile});\
  R = require('ramda');\
  print = function(x){ ;\
  title = R.prop('title',x).replace(/\\s/g,'-');\
@@ -142,9 +135,9 @@ nSTR="J = require('${GITHUB_ISSUES}');\
 };\
  console.log(R.toString(R.chain(print, J)))
 "
-node -e "${nSTR}" | R -pS 'id'
+node -e "${nSTR}" | jq '.[]'
 IFS=$'\n\r'
-readarray ISSUES_FOR_BRANCHES <<< "$(node -e "${nSTR}" | R -S 'id')"
+readarray ISSUES_FOR_BRANCHES <<< "$(node -e "${nSTR}" | jq '.[]')"
 echo "INFO! - ${#ISSUES_FOR_BRANCHES[@]} ISSUES_FOR_BRANCHES"
 count=0
 for i in ${!ISSUES_FOR_BRANCHES[@]}; do
@@ -197,23 +190,6 @@ nSTR="J = require('${jsnFile}');\
 "
 # node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
 source <(node -e "${nSTR}")
-# TODO! double check parsed branch-name with ... below
-# echo "INFO! - *FETCHED_URL*: [ ${FETCHED_URL} ]"
-# echo "INFO! - *FETCHED_EVENTS_URL* : [ ${FETCHED_EVENTS_URL} ]"
-# echo "INFO! - *FETCHED_COMMENTS_URL* : [ ${FETCHED_COMMENTS_URL} ]"
-# echo "INFO! - *FETCHED_ISSUE_UPDATED_AT*: [ ${FETCHED_ISSUE_UPDATED_AT} ]"
-# echo "INFO! - *FETCHED_ISSUE_LABEL*: [ ${FETCHED_ISSUE_LABEL} ]"
-# echo "INFO! - *FETCHED_ISSUE_NUMBER*: [ ${FETCHED_ISSUE_NUMBER} ]"
-# echo "INFO! - *FETCHED_ISSUE_TITLE*: [ ${FETCHED_ISSUE_TITLE} ]"
-# echo "INFO! - *FETCHED_ISSUE_MILESTONE_TITLE*: [ ${FETCHED_ISSUE_MILESTONE_TITLE} ]"
-# echo "INFO! - *FETCHED_ISSUE_MILESTONE_NUMBER*: [ ${FETCHED_ISSUE_MILESTONE_NUMBER} ]"
-# echo "INFO! - *FETCHED_ISSUE_STATE*: [ ${FETCHED_ISSUE_STATE} ]"
-# echo "INFO! - *FETCHED_ISSUE_COMMENTS*: [ ${FETCHED_ISSUE_COMMENTS} ]"
-# echo "INFO! - *FETCHED_ISSUE_BODY* ... "
-# echo "INFO! - *ISSUE_PULLS_URL* : [ ${ISSUE_PULLS_URL} ]"
-# local fileTitle="$( echo "${FETCHED_ISSUE_TITLE}" | tr ' ' '-')"
-# local toFile="${GITHUB_DIR}/issue/${FETCHED_ISSUE_LABEL}-${FETCHED_ISSUE_NUMBER}-${fileTitle}.json"
-# cp ${JSN_ISSUE} ${toFile}
 }
 
 
@@ -223,21 +199,21 @@ function parseIssueMD(){
   [ -e ${JSN_LABELS} ] || return 1
   [ -e ${JSN_MILESTONES} ] || return 1
   source <(sed -n '1,/-->/p' ${ISSUE_FILE} | sed '1d;$d')
-  echo "INFO! - *ISSUE_TITLE*: [ ${ISSUE_TITLE} ]"
-  echo "INFO! - *ISSUE_LABEL*: [ ${ISSUE_LABEL} ]"
+  $verbose && echo "INFO! - *ISSUE_TITLE*: [ ${ISSUE_TITLE} ]"
+  $verbose && echo "INFO! - *ISSUE_LABEL*: [ ${ISSUE_LABEL} ]"
   ISSUE_LABEL_NAME=$(echo $(<${JSN_LABELS}) | jq ".[] | select(.name == \"${ISSUE_LABEL}\") | .name ")
   ISSUE_LABEL_COLOR=$(echo $(<${JSN_LABELS}) | jq ".[] | select(.name == \"${ISSUE_LABEL}\") | .color ")
-  echo "INFO! - *ISSUE_LABEL_NAME*: [ ${ISSUE_LABEL_NAME} ]"
-  echo "INFO! - *ISSUE_LABEL_COLOR*: [ ${ISSUE_LABEL_COLOR} ]"
+  $verbose && echo "INFO! - *ISSUE_LABEL_NAME*: [ ${ISSUE_LABEL_NAME} ]"
+  $verbose && echo "INFO! - *ISSUE_LABEL_COLOR*: [ ${ISSUE_LABEL_COLOR} ]"
   ISSUE_MILESTONE_NUMBER=$(echo "$(<${JSN_MILESTONES})" | jq ".[]  | select(.title == \"${ISSUE_MILESTONE}\") | .number" )
   ISSUE_MILESTONE_TITLE=$(echo "$(<${JSN_MILESTONES})" | jq ".[]  | select(.title == \"${ISSUE_MILESTONE}\") | .title" )
   ISSUE_MILESTONE_DESCRIPTION=$(echo "$(<${JSN_MILESTONES})" | jq ".[]  | select(.title == \"${ISSUE_MILESTONE}\") | .description" )
-  echo "INFO! - *ISSUE_MILESTONE_NUMBER*: [ ${ISSUE_MILESTONE_NUMBER} ]"
-  echo "INFO! - *ISSUE_MILESTONE_TITLE*: [ ${ISSUE_MILESTONE_TITLE} ]"
-  echo "INFO! - *ISSUE_MILESTONE_DESCRIPTION*: [ ${ISSUE_MILESTONE_DESCRIPTION} ]"
+  $verbose && echo "INFO! - *ISSUE_MILESTONE_NUMBER*: [ ${ISSUE_MILESTONE_NUMBER} ]"
+  $verbose &&  echo "INFO! - *ISSUE_MILESTONE_TITLE*: [ ${ISSUE_MILESTONE_TITLE} ]"
+  $verbose &&  echo "INFO! - *ISSUE_MILESTONE_DESCRIPTION*: [ ${ISSUE_MILESTONE_DESCRIPTION} ]"
   ISSUE_BODY="$( branchEchoIssueBody )"
   ISSUE_SUMMARY="$( branchEchoIssueSummary )"
-  echo "INFO! - *ISSUE_SUMMARY*: [ ${ISSUE_SUMMARY} ]"
+  $verbose &&  echo "INFO! - *ISSUE_SUMMARY*: [ ${ISSUE_SUMMARY} ]"
   parseIntoArrayTaskList 'ISSUE_TASK_LIST'
   parseIntoArrayFinishedTasks 'ISSUE_FINISHED_TASKS'
   parseIntoArrayUnfinishedTasks 'ISSUE_UNFINISHED_TASKS'
@@ -357,7 +333,8 @@ source <(node -e "${nSTR}")
 
 function parsePullRequest(){
 [ ! -e "${JSN_PULL_REQUEST}" ] && return 1
-nSTR="J = require('$( parseIntoNodeFS ${JSN_PULL_REQUEST} )');\
+local jsnFile="$(parseIntoNodeFS ${JSN_PULL_REQUEST})"
+local nSTR="J = require('${jsnFile}');\
  R = require('ramda');\
  j = R.pick([\
  'html_url','title','number','milestone','state', 'commits' , 'updated_at',\
@@ -419,7 +396,7 @@ if [ ! -e "${JSN_PR_COMBINED_STATUS}" ] ; then
   return 1
 fi
 local jsnFile="$( parseIntoNodeFS ${JSN_PR_COMBINED_STATUS} )"
-nSTR="J = require('${jsnFile}');\
+local nSTR="J = require('${jsnFile}');\
   console.log('PR_COMBINED_STATUS_STATE=' + J.state);\
   console.log('PR_COMBINED_STATUS_TOTAL_COUNT=' + J.total_count);\
 "
@@ -443,7 +420,8 @@ RELEASE_NAME=
 #DOWNLOAD_COUNT=
 #BROWSER_DOWNLOAD_URL=
 
-nSTR="J = require('${GITHUB_RELEASE}');\
+local jsnFile="$( parseIntoNodeFS ${jSN_RELEASE} )"
+local nSTR="J = require('${jsnFile}');\
  R = require('ramda');\
  j = R.pick([\
  'upload_url','tag_name','name'
@@ -467,7 +445,7 @@ source <(node -e "${nSTR}")
 echo "INFO! - *RELEASE_UPLOAD_URL*: [ ${RELEASE_UPLOAD_URL} ]"
 echo "INFO! - *RELEASE_TAG_NAME*: [ ${RELEASE_TAG_NAME} ]"
 echo "INFO! - *RELEASE_NAME*: [ ${RELEASE_NAME} ]"
- 
+
 }
 
 function parseLatestRelease(){
@@ -546,7 +524,8 @@ ASSET_NAME=
 #DOWNLOAD_COUNT=
 #BROWSER_DOWNLOAD_URL=
 
-nSTR="J = require('${GITHUB_ASSET_UPLOADED}');\
+local jsnFile="$(parseIntoNodeFS ${JSN_ASSET_UPLOADED})"
+local nSTR="J = require('${jsnFile}');\
  R = require('ramda');\
  j = R.pick([\
  'browser_download_url','url','name'

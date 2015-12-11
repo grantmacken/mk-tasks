@@ -31,3 +31,4 @@ clean:
 install:
 	@echo "link stuff that needs to be linked"  
 	@echo $(UP_TARG_DIR)
+	@cd $(UP_TARG_DIR) && npm install

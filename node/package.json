@@ -7,6 +7,7 @@
     "tape": "latest",
     "faucet": "latest",
     "tap-parser": "latest",
+    "properties-parser": "latest",
     "access-sniff": "latest",
     "pa11y": "latest",
     "cheerio": "latest",
@@ -16,12 +17,12 @@
     "xqlint": "latest",
     "markdown-it": "latest",
     "markdown-it-container": "latest",
-    "markdown-it-sanitizer": "latest",
     "html-frontmatter": "latest",
     "stylelint": "latest",
     "cssfmt": "latest",
     "phantomas": "latest",
     "slimerjs": "latest",
+    "casperjs": "latest",
     "yslow-node": "latest",
     "webpagetest": "latest",
     "analyze-css": "latest",
@@ -30,6 +31,7 @@
     "autoprefixer": "latest",
     "cssnext": "latest",
     "cssnano-cli": "latest",
+    "postcss-quantity-queries": "latest",
     "postcss-assets": "latest"
   }
 }

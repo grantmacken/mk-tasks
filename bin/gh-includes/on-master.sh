@@ -25,7 +25,7 @@ function omCreateBranch(){
 [ -z "${BRANCH_SELECTED}" ] && return 1
 echo "TASK! create local branch: *${BRANCH_SELECTED}*"
 echo "CHECK! if *${BRANCH_SELECTED}* does not exist"
-chk=$(
+chk=$(      
   git branch | grep -oP "${BRANCH_SELECTED}"
   )
 if [ -z  "${chk}" ] ;  then
@@ -57,8 +57,8 @@ else
 	echo "FAILURE: TODO if branch exists"
 	return 1
 fi
-git branch -r
-git branch -vv
+$verbose && git branch -r
+$verbose && git branch -vv
 return 0
 }
 
@@ -197,36 +197,25 @@ fi
 echo "INFO! - *LABEL_SELECTED* [ ${LABEL_SELECTED} ]"
 }
 
-################################################################################
-# ISSUE_RELEASE MILESTONES
-## from array RELEASE_MILESTONES
-## this will detirmine the strategy for the
-## version bump from the latest release tag
-## TODO! in bin/init create strategy milestone
-##  strategy-patch etc
-################################################################################
 function omNewIssueMilestone(){
 local rtrn="${1}"
 local string=
+IFS=$'\n\r'
+readarray  RELEASE_MILESTONES <<< \
+    "$(echo "$(<${JSN_MILESTONES})" | \
+    jq '.[] |"\(.title) : milestone[\(.number)] - \(.description)"' | \
+    sed s/\"//g  )"
 
-readarray RELEASE_MILESTONES <<< \
-"$( node -e "\
- J = require('${GITHUB_MILESTONES}');\
- R = require('ramda');\
- var print = function(x){console.log(x.title + ': milestone[' +x.number + '] - '+  x.description)};\
- R.forEach(print,R.project(['title','number', 'description' ], J));")"
-
-local options=()
 for item in  "${RELEASE_MILESTONES[@]}"
   do
-	options+=("$(echo "${item}")")
+	options+=(${item})
   done
 echo "INFO! establish a release strategy based on issue milestone"
 echo "INFO! From options select *ISSUE_MILESTONE*"
 utilitySelectOption 'MILESTONE_SELECTED' || return 1
 #MILESTONE_NUMBER#
-echo " ${MILESTONE_SELECTED}"
-string=$( echo "${MILESTONE_SELECTED}" | grep  -oP '^(\w)+-(\w)+(?=.+$)' )
+echo " ${MILESTONE_SELECTED}"  |  grep  -oP '(\w)+-(\w)+(?=\s.+$)' 
+string=$( echo "${MILESTONE_SELECTED}" | grep  -oP '(\w)+-(\w)+(?=\s.+$)' )
 if [ -n "${string}" ] ; then
   eval ${rtrn}="\"${string}\""
   return 0
@@ -236,6 +225,7 @@ fi
 }
 
 function omSetJsonFromIssueMD(){
+# depends on parseIssueMD @ 'parse.sh'
 local jsnBody="$( echo "$ISSUE_BODY" | jq -s -R '.' | jq '{body: .}' )"
 local jsnMeta=$(
 cat << EOF | jq '{title, assignee, milestone, labels}'
@@ -249,12 +239,10 @@ cat << EOF | jq '{title, assignee, milestone, labels}'
 }
 EOF
 )
-
 jsn=$(
   echo "${jsnMeta}"  "${jsnBody}" | \
   jq -s '.[0] * .[1] | {title, assignee, milestone, labels, body }'
   )
-
 return 0
 }
 
@@ -412,14 +400,6 @@ fi
 
 function omSetIssuesForBranches(){
 echo "TASK! from fetched issues set IssuesForBranches array"
-#echo "$(<${JSN_ISSUES})" | jq -c \
-#    '.[] |  [ .labels[].name, .number ,.title ]' | \
-#    sed -r 's/(\["|"\])//g' | \
-#    sed -r 's/(\s|,")/-/g' | \
-#    sed -r 's/(",)/-/g' > $TEMP_FILE
-#readarray ISSUES_FOR_BRANCHES < $TEMP_FILE
-echo "$(<${JSN_ISSUES})" | jq '.'
-
 readarray ISSUES_FOR_BRANCHES < <(
   echo "$(<${JSN_ISSUES})" | jq -c \
   '.[] |  [ .labels[].name, .number ,.title ]' | \
@@ -596,6 +576,27 @@ echo "DONE! ${doTask}"
 echo "TASK! push to remote"
 doTask=$( git push origin --tags )
 echo "DONE! ${doTask}"
+}
+
+omSemVer(){
+local semverMajor=$( cut -d'.' -f1 <<<  ${1} )
+local semverMinor=$( cut -d'.' -f2 <<<  ${1} )
+local semverPatch=$( cut -d'.' -f3 <<<  ${1} )
+local currentVer="v${semverMajor}.${semverMinor}.${semverPatch}"
+case "${2}" in
+  strategy-patch)
+  newVer="v${semverMajor}.${semverMinor}.$((semverPatch + 1))"
+  ;;
+  strategy-minor)
+  newVer="v${semverMajor}.$((semverMinor + 1)).0"
+  ;;
+  strategy-major)
+  newVer="v$((semverMajor + 1)).0.0"
+  ;;
+  *)
+  newVer="v${semverMajor}.${semverMinor}.$((semverPatch + 1))"
+esac
+echo "${newVer}"
 }
 
 

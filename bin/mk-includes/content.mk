@@ -4,20 +4,16 @@
 # then upload modified content to localhost preview server ->
 # check if livereload server is running
 # check if eXist has stored content via logs
-#  if OK then  
-#  ping server using livereload 
+#  if OK then
+#  ping server using livereload
 #
-# NOTES: if NOT draft then PUT content on remo 
+# NOTES: if NOT draft then PUT content on remo
 #    Upload to remote is handled by eXist localhost server
-#  
+#
 #==========================================================
 #############################################################
 #functions
 
-STORED_POST != tail -n 1 $(POSTS_STORED_LOG)
-STORED_PAGE != tail -n 1 $(PAGES_STORED_LOG)
-LOGGED_TRIGGER != tail -n 1 $(LOG_DIR)/trigger.log 
-#
 date_dir = $(addprefix $1/,$(subst -,/,$(shell echo "$1" | grep -oP '\d{4}-\d{2}-\d{2}')))
 url_dir = $(subst -,/,$(shell echo "$1" | grep -oP '\d{4}-\d{2}-\d{2}'))
 parse_name = $(shell echo "$1" | grep -oP '\d{4}-\d{2}-\d{2}-\K[a-z-]+')
@@ -29,116 +25,66 @@ parse_stem_name = $(shell echo "$1" | grep -oP '\d{4}/\d{2}/\d{2}/\K[a-z-]+')
 parse_stem_date = $(shell echo "$1" | grep -oP '\d{4}/\d{2}/\d{2}')
 archive_url = http://$(NAME)/archive/$(1)
 archive_tag_uri = tag:$(NAME),$(subst /,-,$(call parse_stem_date, $1)):article:$(call parse_stem_name,$1)
-#
-postsArchiveURL=http://$(NAME)$1.html
-postsTagURI=tag:$(NAME),$(CURRENT_DATE):page:$1
+# $(call if_entry_exists,$@,updated)'
 
-define store-build-content
-	@echo data-file: [ $(1) ]
-	@xq store-build-content $(1)
-	@echo local xmldb log: [ $(STORED) ]
-endef
+if_entry_exists = $(if $(wildcard $1),$(call entryText,$1,$2),$(call $2))
 
-define temp-archiver
-	@echo modified [ $(1) ]
-	@mkdir -p  $(addprefix $(TEMP_ARCHIVE_DIR)/, $(call url_dir,$(1)))    
-	@sed '1 { /^<!--/ { :a N; /\n-->/! ba; d} }' $(1) > $(addprefix $(TEMP_ARCHIVE_DIR)/,$(addsuffix .md, $(call archiver,$(1)))) 
-	@node -pe "\
-  fs = require('fs');\
-  fm = require('html-frontmatter')(fs.readFileSync('$(1)', 'utf-8'));\
-  JSON.stringify(fm);\
-  " >  $(addprefix $(TEMP_ARCHIVE_DIR)/,$(addsuffix .json, $(call archiver,$(1)))) 
-endef
+entryText = $(shell node -e " fs = require('fs'); \
+ fs.access('$1',fs.R_OK | fs.W_OK, function (err) { \
+ if (err) { console.log('$(call $2)'); return} ; \
+ n = require('cheerio').load(fs.readFileSync('$1')); \
+ if( typeof n('$2').text() == 'string'){ t = n('$2').text(); \
+ if(t.trim()){console.log(n('$2').text())} \
+ else{console.log('$(call $2)')}}});")
+
+published = $(CURRENT_DATE_TIME)
+updated = $(CURRENT_DATE_TIME)
 
 #############################################################
-CONTENT_PAGES_DIR := content/pages
-TEMP_PAGES_DIR := $(TEMP_DIR)/$(CONTENT_PAGES_DIR)
-DATA_PAGES_DIR := $(DATA_DIR)/pages
-
+POSTS_STORED_LOG=.logs/posts-stored.log
+POSTS_RELOADED_LOG=.logs/posts-reloaded.json
+POSTS_UPLOADED_LOG=.logs/posts-uploaded.log
+STORED_LOG=.temp/stored.log
+UPLOADED_LOG=.temp/uploaded.log
+# POSTS
 CONTENT_POSTS_DIR := content/posts
-TEMP_ARCHIVE_DIR := $(TEMP_DIR)/content/archive
 DATA_ARCHIVE_DIR := $(DATA_DIR)/archive
-#MARKDOWN
-SRC_PAGES := $(call rwildcard,$(CONTENT_PAGES_DIR),*.md)
-TEMP_MD_ARTICLE_PAGES := $(patsubst $(CONTENT_PAGES_DIR)/%.md, $(TEMP_PAGES_DIR)/%.md, $(SRC_PAGES))
-TEMP_FM_PAGES := $(patsubst $(CONTENT_PAGES_DIR)/%.md, $(TEMP_PAGES_DIR)/%.json, $(SRC_PAGES))
-OUT_DATA_PAGES := $(patsubst $(CONTENT_PAGES_DIR)/%.md, $(DATA_PAGES_DIR)/%.xml, $(SRC_PAGES))
-#
 SRC_POSTS := $(call rwildcard,$(CONTENT_POSTS_DIR),*.md)
-TEMP_MD_ARTICLE_POSTS :=  $(foreach src,$(SRC_POSTS),$(addprefix $(TEMP_ARCHIVE_DIR)/,$(addsuffix .md, $(call archiver,$(src)))))
-TEMP_FM_ARTICLE_POSTS :=  $(foreach src,$(SRC_POSTS),$(addprefix $(TEMP_ARCHIVE_DIR)/,$(addsuffix .json, $(call archiver,$(src)))))
-OUT_DATA_POSTS := $(foreach src,$(SRC_POSTS),$(addprefix $(DATA_ARCHIVE_DIR)/,$(addsuffix .xml, $(call archiver,$(src)))))    
-
-
-OUT_PAGES :=  $(TEMP_MD_PAGES) $(TEMP_FM_PAGES) $(OUT_DATA_PAGES)\
- $(PAGES_STORED_LOG)
-
-OUT_POSTS :=  $(TEMP_FM_ARTICLE_POSTS) $(TEMP_MD_ARTICLE_POSTS) $(OUT_DATA_POSTS)\
- $(POSTS_STORED_LOG)
-
-# $(foreach src,$(OUT_POSTS),$(shell mkdir -p $(dir $(src))))
+POSTS_ARTICLES :=  $(foreach src,$(SRC_POSTS),$(addprefix $(DATA_ARCHIVE_DIR)/,$(addsuffix .xml, $(call archiver,$(src)))))
+POST_STORED_LOG := $(LOG_DIR)/posts-stored.log
+POSTS_RELOADED_LOG := $(LOG_DIR)/posts-reloaded.json
+OUT_POSTS := $(POSTS_ARTICLES) $(POSTS_STORED_LOG) $(POSTS_RELOADED_LOG)
+# PAGES
+CONTENT_PAGES_DIR := content/pages
+DATA_PAGES_DIR := $(DATA_DIR)/pages
+SRC_PAGES := $(call rwildcard,$(CONTENT_PAGES_DIR),*.md)
+PAGES_ARTICLES := $(patsubst $(CONTENT_PAGES_DIR)/%.md, $(DATA_PAGES_DIR)/%.xml, $(SRC_PAGES))
+PAGES_STORED_LOG := $(LOG_DIR)/pages-stored.log
+PAGES_RELOADED_LOG := $(LOG_DIR)/pages-reloaded.json
+OUT_PAGES :=  $(PAGES_ARTICLES) $(PAGES_STORED_LOG) $(PAGES_RELOADED_LOG) 
 
 content: $(OUT_POSTS) $(OUT_PAGES)
 
 watch-content:
 	@watch -q $(MAKE) content
 
-.PHONY: postr  watch-content
+.PHONY:   watch-content
 
-info-content:
-	@echo '========= info content =========='
-	@echo $(TEMP_ARCHIVE_DIR)
-	@echo SRC_POSTS $(SRC_POSTS)
-	@echo $(TEMP_MD_ARTICLE_POSTS)
-	@echo $(TEMP_FM_ARTICLE_POSTS)
-	@echo $(OUT_DATA_POSTS)
-	# @echo '---------------------------------------------------------------------'
-# @echo POSTS_STORED_LOG: $(POSTS_STORED_LOG)
-# @echo "file: $(word 1, $(call STORED_POST))"   
-# @echo "eXist:  $(word 2, $(call STORED_POST))"   
-# @echo '---------------------------------------------------------------------'
-# @echo eXist log $(notdir $(XMLDB_LOG) )
-# @echo eXist last item stored $(STORED)
-# @echo '---------------------------------------------------------------------'
-# @echo eXist app log $(LOG_DIR)/trigger.log 
-# @echo eXist last logged trigger
-# @tail -n 1 $(LOG_DIR)/trigger.log
-
-#pages
-$(TEMP_PAGES_DIR)%.md: $(CONTENT_PAGES_DIR)%.md
+$(DATA_ARCHIVE_DIR)%.xml: $(SRC_POSTS)
+	@echo "## $@ ##"
 	@mkdir -p $(@D)
-	@echo " === strip markdown of front-matter === "
-	@echo "SRC $<"
-	@echo "OUT $@"
-	@echo $(TEMP_PAGES_DIR)
-	@echo TEMP_MD_PAGES: $(TEMP_MD_PAGES)
-	@sed '1 { /^<!--/ { :a N; /\n-->/! ba; d} }' $< > $@ 
-
-$(TEMP_PAGES_DIR)%.json: $(CONTENT_PAGES_DIR)%.md
-	@mkdir -p $(@D)
-	@echo " ===  get front-matter from doc === "
-	@echo "SRC $<"
-	@echo "OUT $@"
+	@echo 'Check if there is already a post'
+	@echo '$(wildcard $@)'
+	@sed '1 { /^<!--/ { :a N; /\n-->/! ba; d} }' $(<)  >  $(TEMP_DIR)/$(notdir $(<))
 	@node -pe "\
  fs = require('fs');\
  fm = require('html-frontmatter')(fs.readFileSync('$(<)', 'utf-8'));\
  JSON.stringify(fm);\
-  " > $@
-
-$(DATA_PAGES_DIR)%.xml: $(TEMP_PAGES_DIR)%.md
-	@echo " === convert to xml === "
-	@mkdir -p $(@D)
-	@echo "MD to XML DATA"
-	@echo "STEM: $*"
-	@echo "READ FRONT-MATER: $(TEMP_PAGES_DIR)$*.json"
-	echo "SRC $<"
-	echo "OUT $@"
-	@echo "$$(<$(TEMP_PAGES_DIR)$*.json)" | jq -r -c '.'
-	@echo " -------------------------- "
+  " | jq '.' > $(TEMP_DIR)/$(basename $(notdir $(<))).json
 	@node -pe "\
   R = require('ramda');\
   fs = require('fs');\
-  fm = require('./$(TEMP_PAGES_DIR)$(*).json');\
+  fm = require('./$(TEMP_DIR)/$(basename $(notdir $(<))).json');\
   var n = require('cheerio').load(\
  '<entry>\n<name/>\n<summary/>\n<author/\n><draft/>\n<published/>\n<updated/>\
   <url/><uid/><category/><location/><syndication/><in-reply-to/>\
@@ -148,76 +94,7 @@ $(DATA_PAGES_DIR)%.xml: $(TEMP_PAGES_DIR)%.md
   linkify: true,\
   xhtmlOut: true,\
   typographer: true\
-  }).render(fs.readFileSync('$<').toString()\
-  ) +\
-  '\n</content>\n\
-  </entry>',\
-  {normalizeWhitespace: false,xmlMode: true}\
-  );\
-  if(R.prop('name', fm)){n('name').text(R.prop('name', fm))}else{n('name').text('$(call parse_name,$<)')};\
-  if(R.prop('summary', fm)){n('summary').text(R.prop('summary', fm))}else{n('summary').remove()};\
-  if(R.prop('author', fm)){n('author').text(R.prop('author', fm))}else{n('author').text('$(AUTHOR)')};\
-  if(R.prop('draft', fm)){n('draft').text(R.prop('draft', fm))}else{n('draft').remove()};\
-  if(R.prop('published', fm)){n('published').text(R.prop('published', fm))}else{n('published').text('$(CURRENT_DATE_TIME)')};\
-  if(R.prop('updated', fm)){n('updated').text(R.prop('updated', fm))}else{n('updated').text('$(CURRENT_DATE_TIME)')};\
-  if(R.prop('url', fm)){n('url').text(R.prop('url', fm))}else{n('url').text('$(call postsArchiveURL,$*)')};\
-  if(R.prop('uid', fm)){n('url').text(R.prop('uid', fm))}else{n('uid').text('$(call postsTagURI,$*)')};\
-  if(R.prop('category', fm)){n('category').text(R.prop('category', fm))}else{n('category').remove()};\
-  if(R.prop('location', fm)){n('location').text(R.prop('location', fm))}else{n('location').remove()};\
-  if(R.prop('syndication', fm)){n('syndication').text(R.prop('syndication', fm))}else{n('syndication').remove()};\
-  if(R.prop('in-reply-to', fm)){n('in-reply-to').text(R.prop('in-reply-to', fm))}else{n('in-reply-to').remove()};\
-  n.xml()" > $@
-	@node -pe "\
-  fs = require('fs');\
-  n = require('cheerio').load(fs.readFileSync('$@'));\
-  n.xml();"
-	@echo " -------------------------- "
-
-$(PAGES_STORED_LOG): $(OUT_DATA_PAGES)
-	@echo " === store into local db === "
-	@echo "MODIFIED SRC $?"
-	@echo "COUNT MODIFIED $(words $?)"
-	@$(foreach src,$?,$(call store-build-content,$(src)))
-	@echo " -------------------------- "
-ifeq ($(TINY-LR_UP),)
-	@echo tin-lr NOT up
-else ifneq ($(STORED),)
-	@echo " === live reload === "
-	@echo tiny-lr is UP [ $(TINY-LR_UP) ]
-	@echo and is STORED in xmldb [ $(STORED) ]
-	@echo 'attempt to ping tiny-lr server'
-	@curl -s --ipv4 http://localhost:35729/changed?files=$(shell node -pe '"$?".split(" ").join(",")')
-endif
-	@echo '-----------------------'
-
-################################################################################
-#posts articles frontmatter as json
-
-$(TEMP_ARCHIVE_DIR)%.md  $(TEMP_ARCHIVE_DIR)%.json: $(SRC_POSTS)
-	$(foreach src,$?,$(call temp-archiver,$(src)))
-
-$(DATA_ARCHIVE_DIR)/%.xml: $(TEMP_ARCHIVE_DIR)/%.md 
-	@mkdir -p $(@D)
-	@echo "MD to XML DATA"
-	@echo "md in: [ $(<) ]"
-	@echo "xml out: [ $(@) ]"
-	@echo "STEM: $*"  
-	@echo "$$(<$(TEMP_ARCHIVE_DIR)/$*.json)" | jq -r -c '.'
-	@echo " -------------------------- "
-	@node -pe "\
-  R = require('ramda');\
-  fs = require('fs');\
-  fm = require('./$(TEMP_ARCHIVE_DIR)/$(*).json');\
-  var n = require('cheerio').load(\
- '<entry>\n<name/>\n<summary/>\n<author/\n><draft/>\n<published/>\n<updated/>\
-  <url/><uid/><category/><location/><syndication/><in-reply-to/>\
-  \n<content>\n' +\
-  require('markdown-it')({\
-  html: true,\
-  linkify: true,\
-  xhtmlOut: true,\
-  typographer: true\
-  }).render(fs.readFileSync('$<').toString()\
+  }).render(fs.readFileSync('$(TEMP_DIR)/$(notdir $(<))').toString()\
   ) +\
   '\n</content>\n\
   </entry>',\
@@ -227,35 +104,144 @@ $(DATA_ARCHIVE_DIR)/%.xml: $(TEMP_ARCHIVE_DIR)/%.md
   if(R.prop('summary', fm)){n('summary').text(R.prop('summary', fm))}else{n('summary').remove()};\
   if(R.prop('author', fm)){n('author').text(R.prop('author', fm))}else{n('author').text('$(AUTHOR)')};\
   if(R.prop('draft', fm)){n('draft').text(R.prop('draft', fm))}else{n('draft').remove()};\
-  if(R.prop('published', fm)){n('published').text(R.prop('published', fm))}else{n('published').text('$(CURRENT_DATE_TIME)')};\
-  if(R.prop('updated', fm)){n('updated').text(R.prop('updated', fm))}else{n('updated').text('$(CURRENT_DATE_TIME)')};\
+  if(R.prop('published', fm)){n('published').text(R.prop('published', fm))}else{n('published').text('$(call if_entry_exists,$@,published)')};\
+  if(R.prop('updated', fm)){n('updated').text(R.prop('updated', fm))}else{n('updated').text('$(call if_entry_exists,published,updated)')};\
   if(R.prop('url', fm)){n('url').text(R.prop('url', fm))}else{n('url').text('$(call archive_url,$*)')};\
-  if(R.prop('uid', fm)){n('url').text(R.prop('uid', fm))}else{n('uid').text('$(call archive_tag_uri,$*)))')};\
+  if(R.prop('uid', fm)){n('url').text(R.prop('uid', fm))}else{n('uid').text('$(call archive_tag_uri,$*)')};\
   if(R.prop('category', fm)){n('category').text(R.prop('category', fm))}else{n('category').remove()};\
   if(R.prop('location', fm)){n('location').text(R.prop('location', fm))}else{n('location').remove()};\
   if(R.prop('syndication', fm)){n('syndication').text(R.prop('syndication', fm))}else{n('syndication').remove()};\
   if(R.prop('in-reply-to', fm)){n('in-reply-to').text(R.prop('in-reply-to', fm))}else{n('in-reply-to').remove()};\
   n.xml()" > $@
 	@node -pe "\
+  n = require('cheerio').load(require('fs').readFileSync('$@'));\
+  n.xml();"
+	@echo "$(call if_post_exists,$@,published)"
+	@rm $(TEMP_DIR)/$(notdir $(<)) $(TEMP_DIR)/$(basename $(notdir $(<))).json
+	@rm $(TEMP_DIR)/$(notdir $(<)) $(TEMP_DIR)/$(basename $(notdir $(<))).md
+	echo '------------------------------------------------------------------------'
+
+ $(POSTS_STORED_LOG): $(POSTS_ARTICLES)
+	@echo "## $@ ##"
+	@echo "Store resource into our eXist local dev server\
+ so we get a live preview"
+	@echo "SRC  $? "
+	@echo "output log: $@"
+	@echo "eXist collection_uri: $(join data/,$(REPO))"
+	@echo "directory in file system: $(abspath $(DATA_DIR))"
+	@echo "eXist store pattern: : $(subst $(DATA_DIR)/,,$?) "
+	@echo "mime-type: $(call getMimeType,$(suffix $(notdir $?)))"
+	@echo "log-name: $(basename $(notdir $@))"
+	@echo '-----------------------'
+	@xq store-built-resource \
+ '$(join data/,$(REPO))' '$(abspath $(DATA_DIR))' \
+ '$(subst $(DATA_DIR)/,,$?)' '$(call getMimeType,$(suffix $(notdir $?)))' \
+ '$(basename $(notdir $@))'
+	@tail -n 1  $@
+	@echo '-----------------------------------------------------------------'
+
+$(POSTS_RELOADED_LOG): $(POSTS_STORED_LOG)
+	@echo "## $@ ##"
+ifeq ($(TINY-LR_UP),)
+	@echo 'tiny-lr NOT up'
+else
+	@echo "Let livereload server know we have changed files"
+	@echo "input log: $<"
+	@echo "input log last item: $(shell tail -n 1 $<)"
+	@echo "output log: $@"
+	@curl -s --ipv4 \
+	http://localhost:35729/changed?files=$(shell tail -n 1 $<) | jq '.' > $@
+endif
+	@echo '-----------------------------------------------------------------'
+
+###############################################################################
+#
+#    PAGES
+#
+#
+#
+###############################################################################
+$(DATA_PAGES_DIR)%.xml: $(CONTENT_PAGES_DIR)%.md
+	@echo "## $@ ##"
+	@echo "SRC $<"
+	@echo "OUT $@"
+	@mkdir -p $(@D)
+	@echo " ===  get front-matter from doc === "
+	@node -pe "\
+ JSON.stringify(require('html-frontmatter')(require('fs').readFileSync('$(<)', 'utf-8')))" | \
+ jq '.' >  $(TEMP_DIR)/$(basename $<).json
+	@echo " === strip markdown of front-matter === "
+	@sed '1 { /^<!--/ { :a N; /\n-->/! ba; d} }' $(<)  >  $(TEMP_DIR)/$(basename $<).md
+	@node -pe "\
+  var  fs = require('fs');\
+  var m = require('./$(TEMP_DIR)/$(basename $<).json');\
+  var n = require('cheerio').load(\
+ '<entry>\n<name/>\n<summary/>\n<author/>\n<draft/>\n<published/>\n<updated/>\
+ \n<url/>\n<uid/>\n<category/>\n<location/>\n<syndication/>\
+ \n<content>\n' +\
+  require('markdown-it')({\
+  html: true,\
+  linkify: true,\
+  xhtmlOut: true,\
+  typographer: true\
+  }).render(fs.readFileSync('./$(TEMP_DIR)/$(basename $<).md').toString()) +\
+  '\n</content>\n\
+  </entry>',\
+  {normalizeWhitespace: false,xmlMode: true}\
+  );\
+  if(m.name){n('name').text(m.name)}else{n('name').text('$(notdir $<)')};\
+  if(m.summary){n('summary').text(m.summary)}else{n('summary').remove()};\
+  if(m.author){n('author').text(m.author)}else{n('author').text('${AUTHOR}')};\
+  if(m.draft){n('draft').text(m.draft)}else{n('draft').remove()};\
+  if(m.category){n('category').text(m.category)}else{n('category').remove()};\
+  if(m.location){n('location').text(m.location)}else{n('location').remove()};\
+  if(m.syndication){n('syndication').text(m.syndication)}else{n('syndication').remove()};\
+  n('published').text('$(call entryText,$@,published)');\
+  if(m.updated){n('updated').text(m.updated)}else{n('updated').text('$(call entryText,$@,updated)')};\
+  if(m.url){n('url').text(m.url)}else{n('url').text('http://$(NAME)$(*).html')};\
+  if(m.uid){n('uid').text(m.uid)}else{n('uid').text('tag:$(NAME),$(call parse_date,$(call entryText,$@,published)):page:$(*)')};\
+  n.xml()" | tidy -q -utf8 -xml -i > $@
+	@node -pe "\
   fs = require('fs');\
   n = require('cheerio').load(fs.readFileSync('$@'));\
   n.xml();"
-	@echo " -------------------------- "
 
 
- $(POSTS_STORED_LOG): $(OUT_DATA_POSTS)
-	@echo " === store into local db === "
-	@echo "MODIFIED SRC $?"
-	@echo "COUNT MODIFIED $(words $?)"
-	@$(foreach src,$?,$(call store-build-content,$(src)))
-	@echo " -------------------------- "
+ $(PAGES_STORED_LOG): $(PAGES_ARTICLES)
+	@echo "## $@ ##"
+	@echo "Store resource into our eXist local dev server\
+ so we get a live preview"
+	@echo "SRC  $? "
+	@echo "output log: $@"
+	@echo "eXist collection_uri: $(join data/,$(REPO))"
+	@echo "directory in file system: $(abspath $(DATA_DIR))"
+	@echo "eXist store pattern: : $(subst $(DATA_DIR)/,,$?) "
+	@echo "mime-type: $(call getMimeType,$(suffix $(notdir $?)))"
+	@echo "log-name: $(basename $(notdir $@))"
+	@echo '-----------------------'
+	@xq store-built-resource \
+ '$(join data/,$(REPO))' '$(abspath $(DATA_DIR))' \
+ '$(subst $(DATA_DIR)/,,$?)' '$(call getMimeType,$(suffix $(notdir $?)))' \
+ '$(basename $(notdir $@))'
+	@tail -n 1  $@
+	@echo '-----------------------------------------------------------------'
+
+$(PAGES_RELOADED_LOG): $(PAGES_STORED_LOG)
+	@echo "## $@ ##"
 ifeq ($(TINY-LR_UP),)
-	@echo tin-lr NOT up
-else ifneq ($(STORED),)
-	@echo " === live reload === "
-	@echo tiny-lr is UP [ $(TINY-LR_UP) ]
-	@echo and is STORED in xmldb [ $(STORED) ]
-	@echo 'attempt to ping tiny-lr server'
-	@curl -s --ipv4 http://localhost:35729/changed?files=$(shell node -pe '"$?".split(" ").join(",")')
+	@echo 'tin-lr NOT up'
+else
+	@echo "Let livereload server know we have changed files"
+	@echo "input log: $<"
+	@echo "input log last item: $(shell tail -n 1 $<)"
+	@echo "output log: $@"
+	@curl -s --ipv4 \
+	http://localhost:35729/changed?files=$(shell tail -n 1 $<) | jq '.' > $@
 endif
-	@echo '-----------------------'   
+	@echo '-----------------------------------------------------------------'
+
+################################################################################
+
+# xmlMeta := <name/>\n<summary/>\n<author/>/\n><draft/>\n<published/>\n<updated/><url/>\n<uid/>\n<category/>\n<location/>\n<syndication/>\n<in-reply-to/>
+
+

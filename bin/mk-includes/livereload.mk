@@ -8,27 +8,16 @@
 # Start the livereload server by running `make livereload` and run the
 # reload target with watch by running `watch make reload`
 
-#LIVERELOAD_DIR ?= ./
-#LIVERELOAD_SRC ?= $(shell find $(LIVERELOAD_DIR) -name '*.css' -o -name '*.js')
-DEBUG ?= tinylr:cli
-#DIR ?= $(dir $(lastword $(MAKEFILE_LIST)))
-TINYLR := "$(HOME)"/node_modules/.bin/tiny-lr
-
-#reload: tiny-lr.pid
-#tiny-lr.pid: $(LIVERELOAD_SRC)
-#	@echo "File(s) changed: $?"
-#	@touch $@
-#	curl --ipv4 http://localhost:35729/changed?files=$(shell node -pe '"$?".split(" ").join(",")')
-
 livereload-start:
 	@echo ... Starting server, running in background ...
-	@echo ... Run: "make livereload-stop" to stop the server ...
-	@DEBUG=$(DEBUG) $(TINYLR) &
+	@echo ... Run: "make lr-stop" to stop the server ...
+	@which tiny-lr
+	@tiny-lr  &
 
 # Alias livereload to the start target
-livereload: livereload-start
+lr: livereload-start
 
-livereload-stop:
+lr-stop:
 	curl --ipv4 http://localhost:35729/kill
 
-.PHONY: livereload livereload-start livereload-stop reload
+.PHONY: lr livereload-start lr-stop

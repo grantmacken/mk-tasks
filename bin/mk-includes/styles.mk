@@ -13,9 +13,7 @@
 #
 # 2. put built file into local dev server - log eXist server 'success' response
 #
-# 3.notify livereload server - log lr-server response
-#
-# 4. :
+# 3.notify livereload server - :
 #
 #
 ##############################################################################

@@ -1,10 +1,7 @@
 include config
 include ../common.properties
 SHELL=/bin/bash
-#SHELL += -x
-#SHELL := $(SHELL) -e
-export PATH := $(abspath $(NODE_BIN_DIR))/:$(PATH)
-export PATH := $(abspath $(BIN_DIR))/:$(PATH)
+export PATH := $(abspath $(BIN_DIR)):$(abspath $(NODE_BIN_DIR)):$(PATH)
 
 #CURRENT_MAKEFILE := $(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))
 #MAKEFILE_DIRECTORY := $(dir $(CURRENT_MAKEFILE))
@@ -24,9 +21,8 @@ ifeq ($(wildcard $(SEMVER_FILE)),)
  $(file > $(SEMVER_FILE),v0.0.0)
 endif
 
-VERSION != echo "$$(<$(SEMVER_FILE))"
-
-STORED != tail -n 1 $(XMLDB_LOG) | grep -oP 'storing document \K(.+)'
+VERSION != echo "$$(<$(SEMVER_FILE))" | sed 's/v//'
+XAR != echo "$(PKG_DIR)/xar/$(ABBREV)-$(VERSION).xar"
 
 #recurcive wildcard function
 ## $(call rwildcard,$(WWW_PAGES_DIR),*.md)
@@ -46,7 +42,6 @@ ifneq ($(CURRENT_BRANCH),master)
 endif
 #
 SRC_BUILD := $(wildcard $(BUILD_DIR)/* )
-XAR := $(PKG_DIR)/xar/$(ABBREV)-$(VERSION).xar
 
 ifeq ($(TRAVIS_REPO_SLUG),)
  REPO_SLUG := $(shell git remote -v | grep -oP ':\K.+(?=\.git)' | head -1)
@@ -63,6 +58,9 @@ CURRENT_DATE  != date "+%Y-%m-%d"
 CURRENT_DATE_TIME != date "+%Y-%m-%dT%H:%M:%S"
 
 # common functions
+empty :=
+space := $(empty) $(empty)
+
 getMimeType = $(shell node -pe "\
  fs = require('fs');\
  re = /$1/;\
@@ -72,6 +70,43 @@ getMimeType = $(shell node -pe "\
  return re.test(n(this).text());\
  }).parent().attr('name');\
 ")
+
+#==========================================================
+
+ifneq ($(wildcard $(JSN_ISSUE)),)
+ISSUE_NUMBER !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.number'    
+ISSUE_TITLE !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.title'    
+ISSUE_LABEL !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.labels[0] | .name'    
+ISSUE_NAME = $(subst $(space),-,$(ISSUE_LABEL) $(ISSUE_NUMBER) $(ISSUE_TITLE))
+endif                                                 
+
+ifneq ($(wildcard $(JSN_PULL_REQUEST)),)
+PR_MERGED !=  echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.merged'    
+PR_TITLE !=  echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.title'    
+PR_MILESTONE_TITLE != echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.milestone | .title'    
+PR_MILESTONE_DESCRIPTION != echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.milestone | .description'    
+PR_HEAD_REFERENCE  != echo $$(<$(JSN_PULL_REQUEST)) | jq '.head | .ref'
+PR_BODY !=  echo $$(<$(JSN_PULL_REQUEST)) | jq '.body | @sh'
+endif           
+
+ifneq ($(wildcard $(JSN_RELEASE)),)
+UPLOAD_URL != echo "$$(<$(JSN_RELEASE))" | jq -r -c '.upload_url' | sed -r 's/\{.+//g'
+RELEASE_NAME != echo "$$(<$(JSN_RELEASE))" | jq -r -c '.name'
+RELEASE_TAG_NAME != echo "$$(<$(JSN_RELEASE))" | jq -r -c '.tag_name'
+RELEASE_UPLOAD_FILE != echo "$(PKG_XAR_DIR)/${RELEASE_NAME}.xar"
+RELEASE_UPLOAD_URL != echo "$(UPLOAD_URL)?name=${RELEASE_NAME}.xar&label=${RELEASE_NAME}"
+endif           
+
+ifneq ($(wildcard $(JSN_LATEST_RELEASE)),)
+TAG_NAME != echo "$$(<$(JSN_LATEST_RELEASE))" | jq -r -c '.tag_name'
+BROWSER_DOWNLOAD_URL != echo "$$(<$(JSN_LATEST_RELEASE))" | jq -r -c '.assets[0] | .browser_download_url'
+endif           
+
+ifneq ($(wildcard $(JSN_DEPLOYMENT)),)
+DEPLOYMENT_ID != echo "$$(<$(JSN_DEPLOYMENT))" | jq -r -c '.id'
+endif           
+
+#==========================================================
 
 include $(TASKS_DIR)/*.mk
 
@@ -86,9 +121,9 @@ help:
 	@echo 'DESCRIPTION: $(DESCRIPTION)'
 	@echo 'ABBREV: $(ABBREV)'
 	@echo 'WEBSITE: $(WEBSITE)'
-	@echo 'API_REPO' $(API_REPO)
-	@echo 'CURRENT_BRANCH $(CURRENT_BRANCH)'
-	@echo 'NEXT RELEASE VERSION $(VERSION)'
+	@echo 'API_REPO: $(API_REPO)'
+	@echo 'CURRENT_BRANCH: $(CURRENT_BRANCH)'
+	@echo 'VERSION: $(VERSION)'
 ifneq ($(TRAVIS_TAG),)
 	@echo 'TRAVIS_TAG: $(TRAVIS_TAG)'
 endif
@@ -96,27 +131,10 @@ ifdef PARSED_ISSUE_NUMBER
 	@echo 'PARSED_ISSUE_LABEL: $(PARSED_ISSUE_LABEL)'
 	@echo 'PARSED_ISSUE_NUMBER: $(PARSED_ISSUE_NUMBER)'
 	@echo 'PARSED_ISSUE_TITLE: $(PARSED_ISSUE_TITLE)'
-endif
+endif    
 	@echo XAR $(XAR)
 	@echo TINY-LR_UP $(TINY-LR_UP)
 
-
-tmx:
-	@tmx
-
-#ifneq ($(wildcard $(GH_REPO)),)
-#	@echo 'GH_REPO: $(GH_REPO)'
-#endif
-#ifneq ($(wildcard $(GH_ISSUE)),)
-#	@echo 'ISSUE_COMMENTS $(ISSUE_COMMENTS)'
-#	@echo 'ISSUE_STATE $(ISSUE_STATE)'
-#endif
-#
-STYLES := $(store-css)
-SCRIPTS := $(JS_SCRIPTS)
-ICONS := $(ICONS_MAIN)
-
-#$(POSTS) $(PAGES)  $(SCRIPTS) $(ICONS)
 assets: $(STYLES)
 
 site: $(BUILD_XQUERY_MODULES) $(BUILD_HTML_TEMPLATES)
@@ -127,8 +145,10 @@ watch-site:
 watch-assets:
 	@watch -q $(MAKE) assets
 
-.PHONY:  watch-site  tmx help
-
+watch-issue:
+	@watch -q $(MAKE) issue
 
  test:
-	@prove
+	@prove 
+
+.PHONY: watch-issue watch-assets watch-site help
