@@ -93,7 +93,7 @@ $verbose  && echo "INFO! - *APP_PATH*: [ ${APP_PATH} ]"
 $verbose  && echo "INFO! - *TEMP_XML*: [ ${TEMP_XML} ]"
 # if we have a extended query or a interpolation heredoc
 # then create the query from the
-if [ $ARGUMENTS -eq 1 ]; then                   
+if [ $ARGUMENTS -eq 1 ]; then
   if [ -e "bin/queries/${QUERY}.xq" ] ; then
     queryFile="bin/queries/${QUERY}.xq"
     query=$(<${queryFile})

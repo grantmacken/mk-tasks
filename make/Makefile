@@ -24,9 +24,6 @@ endif
 VERSION != echo "$$(<$(SEMVER_FILE))" | sed 's/v//'
 XAR != echo "$(PKG_DIR)/xar/$(ABBREV)-$(VERSION).xar"
 
-#recurcive wildcard function
-## $(call rwildcard,$(WWW_PAGES_DIR),*.md)
-rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
 
 ifeq ($(TRAVIS_BRANCH),)
  CURRENT_BRANCH := $(shell git symbolic-ref HEAD 2> /dev/null | sed -e 's/refs\/heads\///' )
@@ -71,49 +68,75 @@ getMimeType = $(shell node -pe "\
  }).parent().attr('name');\
 ")
 
-#==========================================================
+#recurcive wildcard function
+## $(call rwildcard,$(WWW_PAGES_DIR),*.md)
+rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
 
-ifneq ($(wildcard $(JSN_ISSUE)),)
-ISSUE_NUMBER !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.number'    
-ISSUE_TITLE !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.title'    
-ISSUE_LABEL !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.labels[0] | .name'    
-ISSUE_NAME = $(subst $(space),-,$(ISSUE_LABEL) $(ISSUE_NUMBER) $(ISSUE_TITLE))
-endif                                                 
+# store resource into eXist 
+#
+# called from 'for each' modified 
+# 2 params in out
+# "SRC  $? "
+# "output log: $@"
+# xq store-built-resource has 4 args
+# "eXist collection_uri: $(join apps/,$(REPO))"
+# "directory in file system: $(abspath  $(subst /$(subst build/,,$?),,$?))"
+# "eXist store pattern: : $(subst build/,,$?) "
+# "mime-type: $(call getTemplatesTestDir,$(suffix $(notdir $?)))"
+# "log-name: $(basename $(notdir $@))" 
+#  Note: eXist contructs path from apps collection 
 
-ifneq ($(wildcard $(JSN_PULL_REQUEST)),)
-PR_MERGED !=  echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.merged'    
-PR_TITLE !=  echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.title'    
-PR_MILESTONE_TITLE != echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.milestone | .title'    
-PR_MILESTONE_DESCRIPTION != echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.milestone | .description'    
-PR_HEAD_REFERENCE  != echo $$(<$(JSN_PULL_REQUEST)) | jq '.head | .ref'
-PR_BODY !=  echo $$(<$(JSN_PULL_REQUEST)) | jq '.body | @sh'
-endif           
-
-ifneq ($(wildcard $(JSN_RELEASE)),)
-UPLOAD_URL != echo "$$(<$(JSN_RELEASE))" | jq -r -c '.upload_url' | sed -r 's/\{.+//g'
-RELEASE_NAME != echo "$$(<$(JSN_RELEASE))" | jq -r -c '.name'
-RELEASE_TAG_NAME != echo "$$(<$(JSN_RELEASE))" | jq -r -c '.tag_name'
-RELEASE_UPLOAD_FILE != echo "$(PKG_XAR_DIR)/${RELEASE_NAME}.xar"
-RELEASE_UPLOAD_URL != echo "$(UPLOAD_URL)?name=${RELEASE_NAME}.xar&label=${RELEASE_NAME}"
-endif           
-
-ifneq ($(wildcard $(JSN_LATEST_RELEASE)),)
-TAG_NAME != echo "$$(<$(JSN_LATEST_RELEASE))" | jq -r -c '.tag_name'
-BROWSER_DOWNLOAD_URL != echo "$$(<$(JSN_LATEST_RELEASE))" | jq -r -c '.assets[0] | .browser_download_url'
-endif           
-
-ifneq ($(wildcard $(JSN_DEPLOYMENT)),)
-DEPLOYMENT_ID != echo "$$(<$(JSN_DEPLOYMENT))" | jq -r -c '.id'
-endif           
+# storeAppResource = $(shell xq store-built-resource \
+#  '$(join apps/,$(REPO))' \
+#  '$(abspath  $(subst /$(subst build/,,$1),,$1))' \
+#  '$(subst build/,,$1)' \
+#  '$(call getMimeType,$(suffix $(notdir $1)))' \
+#  '$(basename $(notdir $2))' && tail -n 1  $2 )
 
 #==========================================================
 
-include $(TASKS_DIR)/*.mk
+# ifneq ($(wildcard $(JSN_ISSUE)),)
+# ISSUE_NUMBER !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.number'    
+# ISSUE_TITLE !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.title'    
+# ISSUE_LABEL !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.labels[0] | .name'    
+# ISSUE_NAME = $(subst $(space),-,$(ISSUE_LABEL) $(ISSUE_NUMBER) $(ISSUE_TITLE))
+# endif                                                 
+
+# ifneq ($(wildcard $(JSN_PULL_REQUEST)),)
+# PR_MERGED !=  echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.merged'    
+# PR_TITLE !=  echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.title'    
+# PR_MILESTONE_TITLE != echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.milestone | .title'    
+# PR_MILESTONE_DESCRIPTION != echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.milestone | .description'    
+# PR_HEAD_REFERENCE  != echo $$(<$(JSN_PULL_REQUEST)) | jq '.head | .ref'
+# PR_BODY !=  echo $$(<$(JSN_PULL_REQUEST)) | jq '.body | @sh'
+# endif           
+
+# ifneq ($(wildcard $(JSN_RELEASE)),)
+# UPLOAD_URL != echo "$$(<$(JSN_RELEASE))" | jq -r -c '.upload_url' | sed -r 's/\{.+//g'
+# RELEASE_NAME != echo "$$(<$(JSN_RELEASE))" | jq -r -c '.name'
+# RELEASE_TAG_NAME != echo "$$(<$(JSN_RELEASE))" | jq -r -c '.tag_name'
+# RELEASE_UPLOAD_FILE != echo "$(PKG_XAR_DIR)/${RELEASE_NAME}.xar"
+# RELEASE_UPLOAD_URL != echo "$(UPLOAD_URL)?name=${RELEASE_NAME}.xar&label=${RELEASE_NAME}"
+# endif           
+
+# ifneq ($(wildcard $(JSN_LATEST_RELEASE)),)
+# TAG_NAME != echo "$$(<$(JSN_LATEST_RELEASE))" | jq -r -c '.tag_name'
+# BROWSER_DOWNLOAD_URL != echo "$$(<$(JSN_LATEST_RELEASE))" | jq -r -c '.assets[0] | .browser_download_url'
+# endif           
+
+# ifneq ($(wildcard $(JSN_DEPLOYMENT)),)
+# DEPLOYMENT_ID != echo "$$(<$(JSN_DEPLOYMENT))" | jq -r -c '.id'
+# endif           
+
+#==========================================================
+ifneq ($(wildcard $(TASKS_DIR)/*.mk),)
+ include $(TASKS_DIR)/*.mk
+endif
 
 default: help
 
 help:
-	@echo printenv
+	@printenv
 	@echo 'NODE_BIN_DIR ': $(abspath $(NODE_BIN_DIR))
 	@echo 'REPO_SLUG': $(REPO_SLUG)
 	@echo 'OWNER': $(OWNER)

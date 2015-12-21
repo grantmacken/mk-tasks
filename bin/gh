@@ -61,7 +61,7 @@ do
     *)
   ;;
   esac
-done  
+done
 
 ARGS_COUNT=$#
 REQUEST=
@@ -173,7 +173,7 @@ case "$REQUEST" in
   list-branches)
   params=( )
   echo "$(<${JSN_BRANCHES})" | \
-  jq -r '["name"],(.[] | [.name]) | @sh' 
+  jq -r '["name"],(.[] | [.name]) | @sh'
   exit
 	;;
   info-branch)
@@ -363,7 +363,7 @@ case "$REQUEST" in
   params=( )
   $verbose && echo "## $REQUEST ##"
   parseIssueMD > /dev/null
-  omSetJsonFromIssueMD 'jsn'       
+  omSetJsonFromIssueMD 'jsn'
   jsn=$(echo "${jsn}")
   $verbose && echo "${jsn}" | jq '.'
   method='POST'
@@ -398,7 +398,7 @@ case "$REQUEST" in
   params=( )
   echo "$(<${JSN_ISSUES})" | jq '.'
   echo "$(<${JSN_ISSUES})" |\
-  jq -r '["number", "title", "milestone", "label"],(.[] | [.number, .title, .milestone.description, .labels[0].name ]) | @sh ' 
+  jq -r '["number", "title", "milestone", "label"],(.[] | [.number, .title, .milestone.description, .labels[0].name ]) | @sh '
   exit
   ;;
   parse-issues)
@@ -433,7 +433,7 @@ case "$REQUEST" in
   ;;
   sync-issue)
   params=( )
-  branchSyncIssue 
+  branchSyncIssue
   exit
   ;;
   commit-issue-task)
@@ -557,7 +557,7 @@ EOF
   echo-pr-merged)
   params=( )
   parsePullRequest > /dev/null
-  echo "${PR_MERGED}" 
+  echo "${PR_MERGED}"
 	exit
 	;;
   merge-pull-request)
@@ -572,7 +572,7 @@ EOF
   commitMessage="pull request merged #${PR_NUMBER}\ntitle - ${PR_TITLE}"
   jsn="{\"commit_message\":\"${commitMessage}\", \"sha\":\"${PR_HEAD_SHA}\"}"
   echo "$jsn" | xq '.'
-  method='PUT'        
+  method='PUT'
   requestURL="${PR_URL}/merge"
   outFile="${JSN_MERGE}"
   expectResponse=200
@@ -621,7 +621,7 @@ EOF
   list-pr-comments)
   params=( )
   jsnPR_COMMENTS=$(<${JSN_PR_COMMENTS})
-  echo $(<${JSN_PR_COMMENTS}) | jq -r '["id", "body"],(.[] | [.id, .body]) | @sh' 
+  echo $(<${JSN_PR_COMMENTS}) | jq -r '["id", "body"],(.[] | [.id, .body]) | @sh'
   exit
   ;;
   get-pr-comment)
@@ -757,7 +757,7 @@ EOF
   echo "INFO! - *PARSED_ISSUE_NUMBER*: [ ${PARSED_ISSUE_NUMBER} ]"
   echo "INFO! - *PARSED_ISSUE_NUMBER*: [ ${PARSED_ISSUE_NUMBER} ]"
   echo "$(<${JSN_PR_STATUSES})" | \
-  jq -r '["id", "state", "context", "description" ],(.[] | [.id, .state, .context, .description]) | @sh' 
+  jq -r '["id", "state", "context", "description" ],(.[] | [.id, .state, .context, .description]) | @sh'
   # echo "$(<${JSN_PR_STATUSES})" | jq  'project [\id \state \context \description ]'  -o table
   exit
   ;;
@@ -837,7 +837,7 @@ EOF
   jsn="{\"tag_name\":\"${1}\",\"target_commitish\":\"master\",\"name\":\"${2}\",\"body\":\"${3}\",\"draft\":false,\"prerelease\":false}"
   echo "${jsn}" | jq '.'
   expectResponse=201
-  ;;             
+  ;;
   delete-release)
   params=( releaseID )
   method='DELETE'
@@ -893,7 +893,7 @@ EOF
 #https://developer.github.com/v3/repos/deployments
   get-deployments)
   params=( )
-  method='GET'           
+  method='GET'
   echo "${REPO_URL}"
   requestURL="${REPO_URL}/deployments"
   expectResponse=200
@@ -901,7 +901,7 @@ EOF
   ;;
   create-deployment)
   params=( tag_name )
-  method='POST'           
+  method='POST'
   requestURL="${REPO_URL}/deployments"
   jsn="{\"ref\":\"${1}\",\"task\":\"deploy\",\"enviroment\":\"local\",\"description\":\"local development enviroment\"}"
   expectResponse=201
@@ -909,7 +909,7 @@ EOF
   ;;
   create-deployment-status)
   params=( id state )
-  method='POST'           
+  method='POST'
   requestURL="${REPO_URL}/deployments/${1}/statuses"
   jsn="{\"state\":\"${2}\",\"target_url\":\"${WEBSITE}\",\"description\":\"app deployed\"}"
   expectResponse=201
@@ -917,12 +917,12 @@ EOF
   ;;
   get-deployment-statuses)
   params=( id )
-  method='GET'           
+  method='GET'
   requestURL="${REPO_URL}/deployments/${1}/statuses"
   expectResponse=200
   outFile="${JSN_DEPLOYMENT_STATUSES}"
   ;;
-#LIST-END# 
+#LIST-END#
  *)
    echo "FAILURE! *no  query* named ${QUERY}"
    ghUsage
