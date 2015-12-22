@@ -271,7 +271,7 @@ case "$REQUEST" in
   jsnLABELS=$(<${JSN_LABELS})
   #echo "${jsnMILESTONES}" | jq -r -c '.[] | [ .title ] '
   #echo "${jsnMILESTONES}" | R -p  'identity'
-  echo "${jsnLABELS}" | R  'project [\name]'  -o table
+  echo "${jsnLABELS}" | jq -r '["name"],(.[] | [.name]) | @sh'
   exit
   ;;
   parse-labels)
@@ -329,10 +329,7 @@ case "$REQUEST" in
   params=( )
   #gh get-labels
   jsnMILESTONES=$(<${JSN_MILESTONES})
-  #echo "${jsnMILESTONES}" | jq -r -c '.[] | [ .title ] '
-  #echo "${jsnMILESTONES}" | R -p  'identity'
-  echo "${jsnMILESTONES}" | R   'project [\number \title \description]'  -o table
-  exit
+  echo "${jsnMILESTONES}" | jq -r -c '.[] | [ .title ] '
   ;;
   select-milestone)
   params=( )

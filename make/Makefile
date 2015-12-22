@@ -95,12 +95,6 @@ rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst 
 
 #==========================================================
 
-# ifneq ($(wildcard $(JSN_ISSUE)),)
-# ISSUE_NUMBER !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.number'    
-# ISSUE_TITLE !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.title'    
-# ISSUE_LABEL !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.labels[0] | .name'    
-# ISSUE_NAME = $(subst $(space),-,$(ISSUE_LABEL) $(ISSUE_NUMBER) $(ISSUE_TITLE))
-# endif                                                 
 
 # ifneq ($(wildcard $(JSN_PULL_REQUEST)),)
 # PR_MERGED !=  echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.merged'    
