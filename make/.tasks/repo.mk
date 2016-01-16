@@ -213,7 +213,7 @@ endif
 # @gh update-semver
 ###############################################################################
 
-build: $(SEMVER_FILE) $(CONFIG_FILE) $(PKG_TEMPLATES) $(PKG_MAIN)  $(XAR)
+build: $(XAR)
 
 $(SEMVER_FILE): $(JSN_MERGE)
 	@echo "##[ $@ ]##"
@@ -302,17 +302,17 @@ PHONY: test-packaging
 #
 ###############################################################################
 
-release: $(JSN_RELEASE) $(JSN_ASSET_UPLOADED) $(JSN_LATEST_RELEASE)
+release: $(JSN_LATEST_RELEASE)
 
 $(JSN_RELEASE): $(XAR)
-	@echo "##[ $@ ]##"
-	@echo 'create release using following params'
-	@echo 'tag-name: $(VERSION)'
-	@echo 'name: $(ABBREV)-$(VERSION)'
-	@echo "body: $(PR_BODY)"
-	@echo $(wildcard $(XAR))
+	@$(info {{{##[ $@ ]##)
+	@$(info create release using following params)
+	@$(info tag-name: $(VERSION))
+	@$(info name: $(ABBREV)-$(VERSION))
+	@$(info body: $(PR_BODY))
+	@$(info xar: $(wildcard $(XAR)))
 	@gh create-release "v$(VERSION)" "$(ABBREV)-$(VERSION)" "$(PR_BODY)"
-	@echo "------------------------------------------------------------------ "
+	@echo "}}}"
 
 $(JSN_ASSET_UPLOADED): $(JSN_RELEASE)
 	@echo "##[ $@ ]##"
@@ -358,26 +358,24 @@ $(JSN_LATEST_RELEASE): $(JSN_ASSET_UPLOADED)
 # $(JSN_DEPLOYMENT) $(JSN_DEPLOYMENT_STATUS) $(JSN_DEPLOYMENT_STATUSES)
 ###############################################################################
 
-deploy:  .logs/xq/install-and-deploy.log
+DEPLOY_LOCAL_LOG =  $(LOG_DIR)/xq/deploy-local.log 
+DEPLOY_REMOTE_LOG =  $(LOG_DIR)/xq/deploy-remote.log 
 
-$(LOG_DIR)/xq/install-and-deploy.log: $(JSN_LATEST_RELEASE)
-	@echo "##[ $@ ]##"
+
+deploy: $(DEPLOY_LOCAL_LOG)
+
+$(DEPLOY_LOCAL_LOG): $(JSN_LATEST_RELEASE)
+	@$(info {{{##[ $@ ]##)
 	@echo $(basename $(notdir $@))
 	@echo "tag-name: $(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.tag_name')"
 	@echo "name: $(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.name')"
 	@echo "WEBSITE: $(WEBSITE)"
 	@echo "browser_download_url: $(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.assets[0] | .browser_download_url' )"
-	@xq -v install-and-deploy "$(WEBSITE)" "$(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.assets[0] | .browser_download_url' )"
-	echo "------------------------------------------------------------------ "
-
-$(JSN_DEPLOYMENT):
-	@echo "##[ $@ ]##"
-	@echo  'deployment to localhost first'
-	@echo "tag-name: $(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.tag_name')"
-	@echo "name: $(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.name')"
-	@echo "browser_download_url: $(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.assets[0] | .browser_download_url' )"
-	@xq install-and-deploy  "$(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.assets[0] | .browser_download_url' )"
-	echo "------------------------------------------------------------------ "
+	@xq -v repo-deploy-local \
+ "$(NAME)" \
+ "$(shell echo $$(<$(JSN_LATEST_RELEASE)) |\
+ jq '.assets[0] | .browser_download_url' )"
+	@echo "}}}"
 
 $(JSN_DEPLOYMENT_STATUS): $(JSN_DEPLOYMENT)
 	@gh create-deployment "$(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.tag_name')"

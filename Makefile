@@ -1,5 +1,6 @@
 SHELL=/bin/bash
 
+example :=  $(abspath ../example.com)
 gmack :=  $(abspath ../gmack.nz)
 WEB_PROJECTS := $(gmack)
 UP_TARG_DIR := $(abspath ../)

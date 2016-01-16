@@ -195,15 +195,27 @@ case "$QUERY" in
   returns='string'
   ;;
   repo-remove)
-  params=( )
-  $verbose  && echo "${NAME}"
-  query="repo:remove('${NAME}')"
+  params=( website )
+  $verbose  && echo "${1}"
+  query="repo:remove('${1}')"
   returns='boolean'
   ;;
-  repo-undeploy )
-  params=( )
-  $verbose  && echo "${NAME}"
-  query="repo:undeploy('${NAME}')"
+  repo-undeploy)
+  params=( website )
+  $verbose  && echo "${1}"
+  query="repo:undeploy('${1}')"
+  returns='repo_status'
+  ;;
+  repo-deploy-local)
+  params=( website download_url )   
+  HOST="${HOST_LOCAL}" 
+  query="repo:install-and-deploy('${1}', '${2}')"
+  returns='repo_status'
+  ;;
+  repo-deploy-remote)
+  params=( website download_url )
+  HOST="${HOST_REMOTE}" 
+  query="repo:install-and-deploy('${1}', '${2}')"
   returns='repo_status'
   ;;
   install-and-deploy)
@@ -352,11 +364,23 @@ case "$QUERY" in
   params=(admin pass)
   KNOWN_USER="$1"
   KNOWN_PASS="$2"
+  APP_PATH="apps"
+  $verbose  && echo "INFO! - *KNOWN_PASS*: [ ${KNOWN_PASS} ]"
+  $verbose  && echo "INFO! - *KNOWN_USER*: [ ${KNOWN_USER} ]"
+  $verbose  && echo "INFO! - *APP_PATH*: [ ${APP_PATH} ]"
+  $verbose  && echo "INFO! - *GIT_USER*: [ ${GIT_USER} ]"
+  $verbose  && echo "INFO! - *GITHUB_ACCESS_TOKEN*: [ ${GITHUB_ACCESS_TOKEN} ]"
   query="sm:passwd('${GIT_USER}', '${GITHUB_ACCESS_TOKEN}')"
   returns='empty'
   ;;
   is-authenticated)
   params=( )
+  APP_PATH="apps"
+  $verbose  && echo "INFO! - *KNOWN_PASS*: [ ${KNOWN_PASS} ]"
+  $verbose  && echo "INFO! - *KNOWN_USER*: [ ${KNOWN_USER} ]"
+  $verbose  && echo "INFO! - *APP_PATH*: [ ${APP_PATH} ]"
+  $verbose  && echo "INFO! - *GIT_USER*: [ ${GIT_USER} ]"
+  $verbose  && echo "INFO! - *GITHUB_ACCESS_TOKEN*: [ ${GITHUB_ACCESS_TOKEN} ]"
   query="sm:is-authenticated()"
   returns='boolean'
   ;;
@@ -364,6 +388,26 @@ case "$QUERY" in
   params=(username password)
   query="sm:passwd('$1', '$2')"
   returns='empty'
+  ;;
+  repo-apps-root)
+  params=( )
+  query="repo:get-root()"
+  returns='string'
+  ;;
+  system-get-module-load-path)
+  params=( )
+  query="system:get-module-load-path()"
+  returns='string'
+  ;;
+  system-get-version)
+  params=( )
+  query="system:get-version()"
+  returns='string'
+  ;;
+  system-get-uptime)
+  params=( )
+  query="system:get-uptime()"
+  returns='string'
   ;;
 #LIST-END#
  *)
