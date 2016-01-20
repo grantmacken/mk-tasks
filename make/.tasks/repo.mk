@@ -1,52 +1,26 @@
-#==========================================================
-ifneq ($(wildcard $(JSN_ISSUE)),)
- ISSUE_NUMBER !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.number'
- ISSUE_TITLE !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.title'
- ISSUE_LABEL !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.labels[0] | .name'
- ISSUE_NAME = $(subst $(space),-,$(ISSUE_LABEL) $(ISSUE_NUMBER) $(ISSUE_TITLE))
+
+G := $(GITHUB_DIR)
+L := $(LOG_DIR)
+
+ifeq ($(CURRENT_BRANCH),master)
+ isMaster = yep
+else
+ isMaster = $(empty)
 endif
 
-ifneq ($(wildcard $(JSN_PULL_REQUEST)),)
- PR_MERGED !=  echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.merged'    
- PR_TITLE !=  echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.title'    
- PR_MILESTONE_TITLE != echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.milestone | .title'    
- PR_MILESTONE_DESCRIPTION != echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.milestone | .description'    
- PR_HEAD_REFERENCE  != echo $$(<$(JSN_PULL_REQUEST)) | jq '.head | .ref'
- PR_BODY !=  echo $$(<$(JSN_PULL_REQUEST)) | jq '.body | @sh'
-endif           
+chkJson = $(shell [ -e $1 ] ||\
+ if [ -e $(G)/headers/$(notdir $(basename $1)).txt ];\
+ then rm $(G)/headers/$(notdir $(basename $1)).txt; fi;\
+ if [ -e $(G)/etags/$(notdir $(basename $1)).etag ];\
+ then rm $(G)/etags/$(notdir $(basename $1)).etag ; fi )
 
-# BUILD TARGET PATTERNS
-#==========================================================
+repo: $(G)/repo.json
 
-SRC_PKG_XQ := $(shell find $(PKG_DIR) -name '*.xq*')
-SRC_PKG_XCONF := $(shell find $(PKG_DIR) -name '*.xconf*')
-SRC_PKG_TMPL := $(PKG_DIR)/repo.xml $(PKG_DIR)/expath-pkg.xml
-SRC_PKG_MAIN := $(SRC_PKG_XCONF) $(SRC_PKG_XQ)
-PKG_MAIN := $(patsubst $(PKG_DIR)/%, $(BUILD_DIR)/%, $(SRC_PKG_MAIN))
-PKG_TEMPLATES := $(patsubst $(PKG_DIR)/%, $(BUILD_DIR)/%, $(SRC_PKG_TMPL))
-
-#############################################################
-
-REPO_LISTS := tags milestones branches
-PR_LISTS := commits comments statuses
-
-pr-lists := $(addsuffix .json,$(addprefix $(GITHUB_DIR)/, $(PR_LISTS) ))
-#==========================================================
-# BUILD TARGET PATTERNS
-#==========================================================
-repo: $(addsuffix .json,$(addprefix $(GITHUB_DIR)/,tags milestones branches))
-
-#############################################################
-# @gh get-$(basename $(notdir $@))
-#############################################################
-
-$(addsuffix .json,$(addprefix $(GITHUB_DIR)/,tags milestones branches)): ${CONFIG_FILE}
-	@echo "##[ $@ ]##"
-	@echo 'SRC: $<'
-	@echo "basename: $(basename $(notdir $@))"
-	gh get-$(basename $(notdir $@))
-	@echo '-------------------------------------------------------------------'
-
+# TODO! incorp  gh default-labels and default milestones
+$(G)/repo.json:
+	@echo "{{{##[ $@ ]##"
+	@gh get-repo
+	@echo "}}}"
 
 ###############################################################################
 # ISSUE WITH TASK LIST
@@ -55,237 +29,150 @@ $(addsuffix .json,$(addprefix $(GITHUB_DIR)/,tags milestones branches)): ${CONFI
 #   * don't push until ready for a pull-request
 #   * before push rebase: `git rebase -i @{u}`
 ###############################################################################
+#{{{
 
-issue: $(JSN_ISSUES) $(ISSUE_FILE) $(JSN_ISSUE) $(JSN_BRANCH)
+issue: $(G)/issues.json
 
-$(JSN_ISSUES): $(JSN_REPO)
-	@echo "##[ $@ ]##"
-ifeq ($(CURRENT_BRANCH),master)
-	@echo  "CURRENT_BRANCH:  $(CURRENT_BRANCH)"
-	@gh get-issues
-endif
-	@echo "------------------------------------------------------------------ "
+branch: $(G)/branch.json
 
-$(ISSUE_FILE): $(JSN_ISSUES)
-	@echo "##[ $@ ]##"
-	@echo  "CURRENT_BRANCH:  $(CURRENT_BRANCH)"
-ifeq ($(CURRENT_BRANCH),master)
-	@echo "only when on master create a new issue-md"
-	@gh new-issue-md
-else
-	@echo "when on branch"
-endif
-	@echo "------------------------------------------------------------------ "
 
-$(JSN_ISSUE): $(ISSUE_FILE)
-	@echo "##[ $@ ]##"
-	@echo  "CURRENT_BRANCH:  $(CURRENT_BRANCH)"
-ifneq ($(CURRENT_BRANCH),master)
-	@echo "PARSED_ISSUE_NUMBER: $(PARSED_ISSUE_NUMBER)"
-	@gh sync-issue
-	@gh commit-issue
-	@gh get-issue $(PARSED_ISSUE_NUMBER)
-else
-	@gh create-issue
-endif
-	@echo "------------------------------------------------------------------ "
+ISSUE.md: $(JSN_REPO)
+	@echo "{{{##[ $@ ]##"
+	$(if $(isMaster),gh new-issue-md ,)
+	$(call chkJson,$@)
+	@echo "}}}"
 
-$(JSN_BRANCH): $(JSN_ISSUE)
-	@echo "##[ $@ ]##"
-	@echo  "CURRENT_BRANCH:  $(CURRENT_BRANCH)"
-	@echo "ISSUE_NUMBER: $(PARSED_ISSUE_NUMBER)"
-	@echo "ISSUE_LABEL: $(PARSED_ISSUE_LABEL)"
-	@echo "ISSUE_TITLE: $(PARSED_ISSUE_TITLE)"
-	@echo "ISSUE_NAME: $(ISSUE_NAME)"
-ifeq ($(CURRENT_BRANCH),master)
-	@echo "only when on master create branch based on issue"
-	@gh create-branch-from-issue
-	@gh get-branch "$(subst $(space),-,$(ISSUE_LABEL) $(ISSUE_NUMBER) $(ISSUE_TITLE))"
-else
-	@echo "when on  branch"
-	@echo "ISSUE_NUMBER: $(ISSUE_NUMBER)"
-	gh get-branch "$(ISSUE_NAME)"
-	#touch $(@)
-endif
-	@echo "------------------------------------------------------------------ "
+$(G)/issue.json: ISSUE.md
+	@echo "{{{##[ $@ ]##"
+	$(if $(isMaster),gh create-issue,)
+	$(call chkJson,$@)
+	@echo "}}}"
+# @echo  "CURRENT_BRANCH:  $(CURRENT_BRANCH)"
+# ifneq ($(CURRENT_BRANCH),master)
+# @echo "PARSED_ISSUE_NUMBER: $(PARSED_ISSUE_NUMBER)"
+# @gh sync-issue
+# @gh commit-issue
+# @gh get-issue $(PARSED_ISSUE_NUMBER)
+# els  # @gh create-issue
+# endif
+
+$(G)/issues.json: $(G)/issue.json
+	@echo "{{{##[ $@ ]##"
+	@$(if $(isMaster),gh get-issues,)
+	@$(call chkJson,$@)
+	@gh list-issues
+	@echo "}}}"
+
+$(G)/branch.json: $(G)/issue.json $(G)/issues.json
+	@echo "{{{##[ $@ ]##"
+	@echo 'ISSUE_NUMBER: $(shell echo $$(< $(<)) | jq '.number')'
+	@echo 'ISSUE_LABEL: $(shell echo $$(< $(<)) | jq '.labels[0]' | jq '.name')'
+	@echo 'ISSUE_TITLE: $(shell echo $$(< $(<)) | jq '.title')'
+	@echo "$(shell echo $$(< $(<)) | jq '[.labels[0].name ,.number, .title ] | .[] | @sh ' )"
+	$(if $(isMaster),gh -v create-branch-from-current-issue,)
+	$(call chkJson,$@)
+	@echo "}}}"
+
+#}}}
 
 ###############################################################################
 # PULL REQUEST PHASE
+#
+###############################################################################
+#{{{
 
-pull-request: $(JSN_PULL_REQUEST) $(JSN_PR_COMMENTS)
+pull-request: $(G)/pr-comments.json
 
-pr-comment: $(JSN_PR_COMMENT)
+pr-comment: $(G)/pr-comment.json
 
 pr-status:  $(JSN_PR_STATUSES)  $(JSN_PR_STATUS) $(JSN_PR_COMBINED_STATUS)
 
 pr-merge: $(JSN_MERGE)
 
-$(JSN_PULL_REQUEST): $(JSN_BRANCH)
-	@echo "##[ $@ ]##"
+$(G)/pull-request.json: $(G)/branch.json
+	@echo "{{{##[ $@ ]##"
 	@gh create-pull-request
-	@echo "------------------------------------------------------------------ "
+	$(call chkJson,$@)
+	@echo "}}}"
 
-$(JSN_PR_COMMENTS): $(JSN_PULL_REQUEST)
-	@echo "##[ $@ ]##"
-ifneq ($(PR_MERGED),true)
+$(G)/pr-comments.json:  $(G)/pull-request.json
+	@echo "{{{##[ $@ ]##"
 	@gh get-pr-comments
-endif
-	@echo "------------------------------------------------------------------ "
+	$(call chkJson,$@)
+	@echo "}}}"
 
-$(JSN_PR_STATUSES): $(JSN_PULL_REQUEST)
-	@echo "##[ $@ ]##"
-ifneq ($(PR_MERGED),true)
-	@gh get-pr-statuses
-endif
-	@echo "------------------------------------------------------------------ "
+# $(JSN_PR_STATUSES): $(JSN_PULL_REQUEST)
+# 	@echo "##[ $@ ]##"
+# ifneq ($(PR_MERGED),true)
+# 	@gh get-pr-statuses
+# endif
+# 	@echo "------------------------------------------------------------------ "
 
-$(JSN_PR_COMMENT): $(JSN_PR_COMMENTS)
-	@echo "##[ $@ ]##"
-	@echo "INPUT: $(JSN_PR_COMMENTS)"
-	@echo "upon meeting conditions create comment for pull request"
-ifeq ($(shell echo "$$(<$(JSN_PR_COMMENTS))" | jq '. | length == 0'),true)
-	@echo "no comments yet, so create a compare url comment"
-	@gh create-pr-compare-url-comment
-else
- ifeq ($(shell echo "$$(<$(JSN_PR_COMMENTS))" | jq '.[] | contains({"body":"compare-url"})' ),false)
-	@echo "pr comments does not contain a compare url"
-	@gh create-pr-compare-url-comment
- else
-	@echo "pr comments contains a compare url"
- endif
- ifeq ($(shell echo "$$(<$(JSN_PR_COMMENTS))" | jq '.[] | contains({"body":"shipit"})' ),false)
-	@echo "pr comments does not contain a shipit comment"
-	@gh create-pr-shipit-comment
- else
-	@echo "pr comments contains a shipit comment"
- endif
-endif
-	@echo "------------------------------------------------------------------ "
+$(G)/pr-comment.json: $(G)/pr-comments.json
+	@echo "{{{##[ $@ ]##"
+	@eval $(echo "$$(< $<)" | jq -r '. | length == 0') &&\
+ gh create-pr-compare-url-comment &&  gh get-pr-comments
 
-$(JSN_PR_STATUS): $(JSN_PR_STATUSES)
-	@echo "##[ $@ ]##"
-	@echo "INPUT: $(JSN_PR_STATUSES)"
-	@echo $(WEBSITE)
-	@echo "if lints and test OK check OK! create default status for pull request"
-	@echo "LINTS:[stylelint]( https://github.com/stylelint/stylelint )"
-	@echo "stylelint will lint src and exit std err on failure"
-	@stylelint  $(STYLE_SRC_DIR)/* --config $(STYLELINT_CONFIG)
-	@echo "------------------------------------------------------------------ "
-	@echo "STYLES:  "
-	@analyze-css --pretty --url $(WEBSITE)/styles | jq '.metrics' | tee $(LOG_DIR)/analyze-css-metrics.json  | jq '.'
-	@echo 'prove tap test. test written with tape'
-	@prove -o  t/analyze-css-metrics.t
-	@echo "Conditions meet, so create default suucess status "
-	gh create-pr-default-success-status
-	@echo "------------------------------------------------------------------ "
+# $(if $(shell echo "$$(<$(JSN_PR_COMMENTS))" | jq '. | length == 0' | @sh ),true)
+# @echo "no comments yet, so create a compare url comment"
+# @gh create-pr-compare-url-comment
+# else
+# ifeq ($(shell echo "$$(<$(JSN_PR_COMMENTS))" | jq '.[] | contains({"body":"compare-url"})' ),false)
+# @echo "pr comments does not contain a compare url"
+# @gh create-pr-compare-url-comment
+# else
+# @echo "pr comments contains a compare url"
+# endif
+# ifeq ($(shell echo "$$(<$(JSN_PR_COMMENTS))" | jq '.[] | contains({"body":"shipit"})' ),false)
+# @echo "pr comments does not contain a shipit comment"
+# @gh create-pr-shipit-comment
+# else
+# @echo "pr comments contains a shipit comment"
+# endif
+# endif
+	# @echo "}}}"
 
-$(JSN_PR_COMBINED_STATUS): $(JSN_PR_STATUS)
-	@echo "##[ $@ ]##"
-	@echo "whenever we get a new status report fetch the combined status report"
-	gh get-pr-combined-status
-	@echo "------------------------------------------------------------------ "
+# $(JSN_PR_STATUS): $(JSN_PR_STATUSES)
+# 	@echo "##[ $@ ]##"
+# 	@echo "INPUT: $(JSN_PR_STATUSES)"
+# 	@echo $(WEBSITE)
+# 	@echo "if lints and test OK check OK! create default status for pull request"
+# 	@echo "LINTS:[stylelint]( https://github.com/stylelint/stylelint )"
+# 	@echo "stylelint will lint src and exit std err on failure"
+# 	@stylelint  $(STYLE_SRC_DIR)/* --config $(STYLELINT_CONFIG)
+# 	@echo "------------------------------------------------------------------ "
+# 	@echo "STYLES:  "
+# 	@analyze-css --pretty --url $(WEBSITE)/styles | jq '.metrics' | tee $(LOG_DIR)/analyze-css-metrics.json  | jq '.'
+# 	@echo 'prove tap test. test written with tape'
+# 	@prove -o  t/analyze-css-metrics.t
+# 	@echo "Conditions meet, so create default suucess status "
+# 	gh create-pr-default-success-status
+# 	@echo "------------------------------------------------------------------ "
 
-$(JSN_MERGE): $(JSN_PR_COMBINED_STATUS) 
-	@echo "##[ $@ ]##"
-	@echo "upon meeting conditions create release"
-	@echo "$$(<$<)" | jq '.state == "success"'
-	@echo "$$(<$<)" | jq '.total_count == 2'
-	@echo "$$(<$<)" | jq '.statuses | .[] | contains({"state":"success"})'
-	@echo "$$(<$<)" | jq 'contains({statuses: [{"description": "All good"}]})'
-	@echo "$$(<$<)" | jq '(.state == "success") and (contains({statuses: [{"description": "All  good"}]}))'
-ifeq ($(shell echo $$(<$(JSN_PR_COMBINED_STATUS)) | jq '(.state == "success") and (contains({statuses: [{"description": "All good"}]}))'),true)
-	@echo "pull request combined status all ready to merge"
-	@gh merge-pull-request
-endif
-	@echo "------------------------------------------------------------------ "
+# $(JSN_PR_COMBINED_STATUS): $(JSN_PR_STATUS)
+# 	@echo "##[ $@ ]##"
+# 	@echo "whenever we get a new status report fetch the combined status report"
+# 	gh get-pr-combined-status
+# 	@echo "------------------------------------------------------------------ "
 
-###############################################################################
-# BUILD PHASE
-# pull request merged and now on master:
-# update semver TODO! discuss how this is done
-# update config
-# interpolation 'semver and config' vars into template and place in build
-# copy over other changed package files into build
-# everything else (templates, modules , resources ) should be already there
-# update xar  TODO! might have to recurse to update version
-#   $(CONFIG_FILE) $(PKG_TEMPLATES) $(PKG_MAIN) $(XAR)
-#
-# @gh update-semver
-###############################################################################
-
-build: $(XAR)
-
-$(SEMVER_FILE): $(JSN_MERGE)
-	@echo "##[ $@ ]##"
-	@echo "upon merge create a new semver file for release"
-ifeq ($(PR_MERGED),true)
-	@echo  $(PR_MERGED)
-	@echo  $(PR_MILESTONE_TITLE)
-	@gh update-semver "$$(xq -r app-semver | sed 's/v//' )" "$(PR_MILESTONE_TITLE)" | tee  $@
-endif
-
-$(CONFIG_FILE): $(SEMVER_FILE)
-	@echo "##[ $@ ]##"
-	@echo "whenever semver changes touch config so we get a fresh build"
-	@echo "$$(<$@)"
-	@touch $@
-	@echo "------------------------------------------------------------------ "
-
-# use cheerio as xml parser
-$(BUILD_DIR)/repo.xml: $(PKG_DIR)/repo.xml $(CONFIG_FILE)
-	@echo "##[ $@ ]##"
-	@echo  "SRC  $< "
-	@node -e "\
- var cheerio = require('cheerio');var fs = require('fs');\
- var x = fs.readFileSync('./$<').toString();\
- var n = cheerio.load(x,{normalizeWhitespace: false,xmlMode: true});\
- n('description').text('$(DESCRIPTION)');\
- n('author').text('$(AUTHOR)');\
- n('website').text('$(WEBSITE)');\
- n('target').text('$(NAME)');\
- require('fs').writeFileSync('./$@', n.xml() )"
-	@echo "------------------------------------------------------------------ "
-
-$(BUILD_DIR)/expath-pkg.xml: $(PKG_DIR)/expath-pkg.xml $(CONFIG_FILE)
-	@echo  "MODIFY $@"
-	@echo "##[ $@ ]##"
-	@echo  "SRC  $< "
-	@node -e "\
- var cheerio = require('cheerio');var fs = require('fs');\
- var x = fs.readFileSync('./$<').toString();\
- var n = cheerio.load(x,{normalizeWhitespace: false,xmlMode: true});\
- n('package').attr('name', '$(WEBSITE)');\
- n('package').attr('abbrev', '$(ABBREV)');\
- n('package').attr('version', '$(VERSION)');\
- n('package').attr('spec', '1.0');\
- n('title').text('$(NAME)');\
- require('fs').writeFileSync('./$@', n.xml() )"
-	@echo "------------------------------------------------------------------ "
+# $(JSN_MERGE): $(JSN_PR_COMBINED_STATUS)
+# 	@echo "##[ $@ ]##"
+# 	@echo "upon meeting conditions create release"
+# 	@echo "$$(<$<)" | jq '.state == "success"'
+# 	@echo "$$(<$<)" | jq '.total_count == 2'
+# 	@echo "$$(<$<)" | jq '.statuses | .[] | contains({"state":"success"})'
+# 	@echo "$$(<$<)" | jq 'contains({statuses: [{"description": "All good"}]})'
+# 	@echo "$$(<$<)" | jq '(.state == "success") and (contains({statuses: [{"description": "All  good"}]}))'
+# ifeq ($(shell echo $$(<$(JSN_PR_COMBINED_STATUS)) | jq '(.state == "success") and (contains({statuses: [{"description": "All good"}]}))'),true)
+# 	@echo "pull request combined status all ready to merge"
+# 	@gh merge-pull-request
+# endif
+# 	@echo "------------------------------------------------------------------ "
 
 
-# Copy over package root files
-$(BUILD_DIR)/%: $(PKG_DIR)/%
-	@mkdir -p $(dir $@)
-	@echo "FILE $@ $<"
-	@cp $< $@
-	@echo "------------------------------------------------------------------ "
 
-# Create package with zip
-# but exclude the data dir
-# TODO! might also exclude binary media
-$(XAR): $(wildcard $(BUILD_DIR)/* )
-	@echo "##[ $@ ]##"
-	@mkdir -p $(dir $@)
-	@echo "XAR FILE $@"
-	@cd $(BUILD_DIR); zip -r ../$@ . -x 'data*'
-	@echo "------------------------------------------------------------------ "
 
-test-packaging:
-	@echo 'TEST PACKAGING'
-	@prove t/packaging.t
-	@echo "------------------------------------------------------------------ "
-
-PHONY: test-packaging
+# }}}
 ###############################################################################
 # RELEASE and main release asset
 #
@@ -300,43 +187,50 @@ PHONY: test-packaging
 #
 #  upload-release-asset  params=( uploadFile uploadURL contentType )
 #
+#{{{
 ###############################################################################
 
-release: $(JSN_LATEST_RELEASE)
+release: $(G)/tags.json
 
-$(JSN_RELEASE): $(XAR)
+$(G)/release.json: $(XAR)
 	@$(info {{{##[ $@ ]##)
 	@$(info create release using following params)
 	@$(info tag-name: $(VERSION))
 	@$(info name: $(ABBREV)-$(VERSION))
-	@$(info body: $(PR_BODY))
+	@$(info body: $(shell echo $$(<$(JSN_PULL_REQUEST)) | jq '.body | @sh'))
 	@$(info xar: $(wildcard $(XAR)))
-	@gh create-release "v$(VERSION)" "$(ABBREV)-$(VERSION)" "$(PR_BODY)"
+	@gh create-release "v$(VERSION)" "$(ABBREV)-$(VERSION)" "$(shell echo $$(<$(JSN_PULL_REQUEST)) | jq '.body | @sh')"
 	@echo "}}}"
 
-$(JSN_ASSET_UPLOADED): $(JSN_RELEASE)
-	@echo "##[ $@ ]##"
-	@echo "tag-name: $(shell echo $$(<$(JSN_RELEASE)) | jq '.tag_name')"
-	@echo "name: $(shell echo $$(<$(JSN_RELEASE)) | jq '.name')"
+$(G)/asset_uploaded.json: $(G)/release.json
+	@echo "{{{##[ $@ ]##"
+	@echo "tag-name: $(shell echo $$(<$(<)) | jq '.tag_name')"
+	@echo "name: $(shell echo $$(<$(<)) | jq '.name')"
 	@echo 'upload release using following params'
 	@echo "upload-file: $(XAR)"
 	@echo "------------------------------------------------------------------ "
 	@echo "upload-url:"
-	@echo "$$(echo $$(<$(JSN_RELEASE)) | jq '.upload_url' | sed -r 's/\{.+//g')?name=$(notdir $(XAR))"
+	@echo "$$(echo $$(<$(<)) | jq '.upload_url' | sed -r 's/\{.+//g')?name=$(notdir $(XAR))"
 	@echo "------------------------------------------------------------------ "
 	@echo "contentType: $(call getMimeType,$(suffix $(notdir $(XAR))))"
 	@gh upload-release-asset \
  "$(XAR)" \
- "$(shell echo \"$$(echo $$(<$(JSN_RELEASE)) | jq '.upload_url' | sed -r 's/\{.+//g')?name=$(notdir $(XAR)))\")" \
+ "$(shell echo \"$$(echo $$(<$(<)) | jq '.upload_url' | sed -r 's/\{.+//g')?name=$(notdir $(XAR)))\")" \
  "$(call getMimeType,$(suffix $(notdir $(XAR))))"
-	@echo "------------------------------------------------------------------ "
+	@echo "}}}"
 
-$(JSN_LATEST_RELEASE): $(JSN_ASSET_UPLOADED)
+$(G)/latest-release.json: $(G)/asset_uploaded.json
 	@echo "##[ $@ ]##"
 	@gh get-latest-release
 	@echo "------------------------------------------------------------------ "
 
-
+$(G)/tags.json: $(G)/latest-release.json
+	@echo "##[ $@ ]##"
+	@gh get-tags
+	@git pull --tags
+	@git tag
+	@echo "------------------------------------------------------------------ "
+#}}}
 ###############################################################################
 # DEPLOYMENTo
 #  create a github deployment with conditional contexts
@@ -356,38 +250,40 @@ $(JSN_LATEST_RELEASE): $(JSN_ASSET_UPLOADED)
 # @pa11y $(WEBSITE) --level none --standard WCAG2A
 # @echo "------------------------------------------------------------------ "
 # $(JSN_DEPLOYMENT) $(JSN_DEPLOYMENT_STATUS) $(JSN_DEPLOYMENT_STATUSES)
+#{{{
 ###############################################################################
 
-DEPLOY_LOCAL_LOG =  $(LOG_DIR)/xq/deploy-local.log 
-DEPLOY_REMOTE_LOG =  $(LOG_DIR)/xq/deploy-remote.log 
+DEPLOY_REMOTE_LOG =  $(LOG_DIR)/xq/deploy-remote.log
 
 
-deploy: $(DEPLOY_LOCAL_LOG)
+deploy: $(L)/xq/deploy-local.log
 
-$(DEPLOY_LOCAL_LOG): $(JSN_LATEST_RELEASE)
-	@$(info {{{##[ $@ ]##)
+$(L)/xq/deploy-local.log: $(G)/latest-release.json
+	@echo '{{{##[ $@ ]##'
 	@echo $(basename $(notdir $@))
-	@echo "tag-name: $(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.tag_name')"
-	@echo "name: $(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.name')"
+	@echo "tag-name: $(shell echo $$(<$(<)) | jq '.tag_name')"
+	@echo "name: $(shell echo $$(<$(<)) | jq '.name')"
 	@echo "WEBSITE: $(WEBSITE)"
-	@echo "browser_download_url: $(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.assets[0] | .browser_download_url' )"
+	@echo "browser_download_url: $(shell echo $$(<$(<)) | jq '.assets[0] | .browser_download_url' )"
 	@xq -v repo-deploy-local \
- "$(NAME)" \
- "$(shell echo $$(<$(JSN_LATEST_RELEASE)) |\
+ "$(WEBSITE)" \
+ "$(shell echo $$(<$(<)) |\
  jq '.assets[0] | .browser_download_url' )"
 	@echo "}}}"
 
-$(JSN_DEPLOYMENT_STATUS): $(JSN_DEPLOYMENT)
-	@gh create-deployment "$(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.tag_name')"
-	@echo "##[ $@ ]##"
-	@echo  "after localhost tests create default success status"
-	@echo "DEPLOYMENT_ID: $(DEPLOYMENT_ID)"
-	@gh create-deployment-status '$(DEPLOYMENT_ID)' 'success'
-	echo "------------------------------------------------------------------ "
+# $(JSN_DEPLOYMENT_STATUS): $(JSN_DEPLOYMENT)
+# 	@gh create-deployment "$(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.tag_name')"
+# 	@echo "##[ $@ ]##"
+# 	@echo  "after localhost tests create default success status"
+# 	@echo "DEPLOYMENT_ID: $(DEPLOYMENT_ID)"
+# 	@gh create-deployment-status '$(DEPLOYMENT_ID)' 'success'
+# 	echo "------------------------------------------------------------------ "
 
-$(JSN_DEPLOYMENT_STATUSES): $(JSN_DEPLOYMENT_STATUS)
-	@echo "##[ $@ ]##"
-	@echo "DEPLOYMENT_ID: $(DEPLOYMENT_ID)"
-	@gh get-deployment-statuses '$(DEPLOYMENT_ID)'
-	@xq -r  install-and-deploy  "$(NAME)" "$(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.assets[0] | .browser_download_url' )"
-	echo "------------------------------------------------------------------ "
+# $(JSN_DEPLOYMENT_STATUSES): $(JSN_DEPLOYMENT_STATUS)
+# 	@echo "{{{##[ $@ ]##"
+# 	@echo "DEPLOYMENT_ID: $(DEPLOYMENT_ID)"
+# 	@gh get-deployment-statuses '$(DEPLOYMENT_ID)'
+# 	@xq -r  install-and-deploy  "$(NAME)" "$(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.assets[0] | .browser_download_url' )"
+# 	echo "}}}"
+
+###}}}

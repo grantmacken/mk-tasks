@@ -3,12 +3,12 @@
 #==========================================================
 SRC_MODULES := $(shell find modules -name '*.xq*' )
 MODULES_BUILD_DIR := $(BUILD_DIR)/modules
-MODULES_BUILT := $(patsubst modules/%, $(MODULES_BUILD_DIR)/%, $(SRC_MODULES))
+MODULES := $(patsubst modules/%, $(MODULES_BUILD_DIR)/%, $(SRC_MODULES))
 MODULES_STORED_LOG   := $(LOG_DIR)/modules-stored.log
 MODULES_RELOADED_LOG := $(LOG_DIR)/modules-reloaded.log 
 MODULES_TESTED_LOG := $(LOG_DIR)/modules-tested.log 
 #############################################################
-modules: $(MODULES_BUILT)  $(MODULES_STORED_LOG)  $(MODULES_RELOADED_LOG)
+modules: $(MODULES)  $(MODULES_STORED_LOG)  $(MODULES_RELOADED_LOG)
 
 test-modules: $(MODULES_TESTED_LOG)
 
@@ -56,7 +56,9 @@ $(MODULES_RELOADED_LOG): $(MODULES_STORED_LOG)
 	@curl -s --ipv4  http://localhost:35729/changed?files=$(shell tail -n 1 $<) > $@
 	@echo '-----------------------------------------------------------------'
 
-getModulesTestDir != echo $$(< $(MODULES_RELOADED_LOG) ) | jq -r '.files[0]' | grep -oP '$(REPO)/\K.+(?=/(\w)+\.)'  
+getModulesTestDir != if [ -e  $(MODULES_RELOADED_LOG) ] ; then\
+ echo $$(< $(MODULES_RELOADED_LOG)) | jq -r '.files[0]' |\
+ grep -oP '$(REPO)/\K.+(?=/(\w)+\.)'; fi  
 
 $(MODULES_TESTED_LOG): $(MODULES_RELOADED_LOG)
 	@echo "## $@ ##"
@@ -64,10 +66,9 @@ $(MODULES_TESTED_LOG): $(MODULES_RELOADED_LOG)
 	@echo -n "... look in '"
 	@echo -n "t/$(getModulesTestDir)"  
 	@echo "' for test plans"
-ifneq ($(wildcard t/$(getModulesTestDir)/*.js),)
+	@$(if $(wildcard t/$(getModulesTestDir)/*.js),\
+ casperjs test  $(wildcard t/$(getModulesTestDir)/*.js)  2>/dev/null,)
 	@echo "prove ...."
-	@casperjs test  $(wildcard t/$(getModulesTestDir)/*.js)  2>/dev/null
-endif
 	@echo "input log: $<"
 	@echo "output log: $@"
 	echo '-----------------------------------------------------------------'

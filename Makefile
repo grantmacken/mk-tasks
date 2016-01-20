@@ -5,6 +5,8 @@ gmack :=  $(abspath ../gmack.nz)
 WEB_PROJECTS := $(gmack)
 UP_TARG_DIR := $(abspath ../)
 
+default: build
+
 info:
 	@echo "$(UP_TARG_DIR)"
 
@@ -14,6 +16,7 @@ build:
 	stow -t $(UP_TARG_DIR) properties
 	stow -t $(UP_TARG_DIR) node
 	stow -t $(gmack) make
+	stow -t $(example) make
 
 clean:
 	@stow -D -t  $(UP_TARG_DIR)/bin bin

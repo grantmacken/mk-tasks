@@ -3,7 +3,7 @@
 #==========================================================
 SRC_TEMPLATES := $(shell find templates -name '*.html')
 TEMPLATES_BUILD_DIR := $(BUILD_DIR)/templates
-TEMPLATES_BUILT := $(patsubst templates/%, $(TEMPLATES_BUILD_DIR)/%, $(SRC_TEMPLATES))
+TEMPLATES := $(patsubst templates/%, $(TEMPLATES_BUILD_DIR)/%, $(SRC_TEMPLATES))
 TEMPLATES_BUILT_LOG   := $(LOG_DIR)/templates-built.log
 TEMPLATES_STORED_LOG   := $(LOG_DIR)/templates-stored.log
 TEMPLATES_RELOADED_LOG := $(LOG_DIR)/templates-reloaded.log
@@ -17,7 +17,7 @@ getTemplatesTestDir != [ -e  $(TEMPLATES_RELOADED_LOG) ] && \
  grep -oP '$(REPO)/\K.+(?=/(\w)+\.)'
 
 #############################################################
-templates: $(TEMPLATES_BUILT) $(TEMPLATES_STORED_LOG) $(TEMPLATES_RELOADED_LOG)
+templates: $(TEMPLATES) $(TEMPLATES_STORED_LOG) $(TEMPLATES_RELOADED_LOG)
  #  $(TEMPLATES_STORED_LOG)  $(TEMPLATES_RELOADED_LOG) 
 watch-templates:
 	@watch -q $(MAKE) templates

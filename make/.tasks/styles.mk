@@ -21,8 +21,8 @@ STYLE_SRC_DIR := resources/styles
 STYLE_MAIN := $(STYLE_SRC_DIR)/main.css
 STYLE_STYLES := $(shell find $(STYLE_SRC_DIR) -name '*.css')
 STYLE_IMPORTS := $(filter-out $(STYLE_MAIN),$(STYLE_STYLES))
-STYLE_OUT_DIR := $(BUILD_DIR)/resources/styles
-OUT_STYLES  :=  $(STYLE_OUT_DIR)/main.css
+STYLE_BUILD_DIR := $(BUILD_DIR)/$(STYLE_SRC_DIR)
+STYLES  :=  build/resources/styles/main.css
 ANALYZE_CSS  :=  $(LOG_DIR)/analyze-css.json
 STYLES_STORED_LOG :=   $(LOG_DIR)/css-stored.log
 STYLES_RELOADED_LOG :=  $(LOG_DIR)/css-reloaded.log
@@ -30,8 +30,7 @@ STYLES_TESTED :=   $(LOG_DIR)/phantomas.json
 STYLES_UPLOADED_LOG :=   $(LOG_DIR)/css-uploaded.log
 
 #############################################################
-styles: $(OUT_STYLES) $(STYLES_STORED_LOG)  $(STYLES_RELOADED_LOG) $(STYLES_TESTED)
-
+styles: $(STYLES) $(STYLES_STORED_LOG)  $(STYLES_RELOADED_LOG) $(STYLES_TESTED)
 
 styles-help:
 	@touch $(STYLE_MAIN)
@@ -60,12 +59,10 @@ test-styles:
 
 
 #############################################################
-#
-#  @cssfmt $< $@
 # @cssnext --compress $(<) $@
 #############################################################
 
-$(OUT_STYLES): $(STYLE_MAIN) $(STYLE_IMPORTS)
+build/resources/styles/main.css: $(STYLE_MAIN) $(STYLE_IMPORTS)
 	@echo "## $@ ##"
 	@mkdir -p $(dir $@)
 	@echo $@

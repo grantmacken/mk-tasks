@@ -1,4 +1,5 @@
 #!/bin/bash +x
+
 ############################
 
 function branchInfo(){
@@ -15,19 +16,13 @@ function branchIsMaster(){
 }
 
 function omCreateBranch(){
-##TODO!
 # do prechecks
 [ -n "$(git status -s --porcelain --untracked-file=no)" ]  && \
   git add . ; git commit -am 'prep for first run'
-    #TODO check for each stage
-    #echo "TASK!: pull down the latest changes from origin master"
-
 [ -z "${BRANCH_SELECTED}" ] && return 1
 echo "TASK! create local branch: *${BRANCH_SELECTED}*"
 echo "CHECK! if *${BRANCH_SELECTED}* does not exist"
-chk=$(      
-  git branch | grep -oP "${BRANCH_SELECTED}"
-  )
+chk=$( git branch | grep -oP "${BRANCH_SELECTED}" )
 if [ -z  "${chk}" ] ;  then
   echo "YEP! *${BRANCH_SELECTED}* does *not* exist OK!"
   doTask=$(
@@ -36,7 +31,7 @@ if [ -z  "${chk}" ] ;  then
   chk=$( echo "${doTask}" | grep -oP 'set up to track remote branch' )
   if [ -n "${chk}" ] ; then
 	  echo "INFO!: - ${doTask}"
-	  local msg=$(
+	  local msg=$(                                                 
 	  git reflog | \
 	  head -1 |
 	  grep -oP 'checkout:\s.+' )
@@ -61,91 +56,6 @@ $verbose && git branch -r
 $verbose && git branch -vv
 return 0
 }
-
-
-
-
-function branchWhenOnMaster(){
-[ ${CURRENT_BRANCH} = 'master' ] || return 1
-echo "INFO!  *CURRENT_BRANCH*: [ ${CURRENT_BRANCH} ]"
-[ -e ${JSN_REPO} ]  || {
-  echo "FAILURE! no file ${JSN_REPO}"
-  exit 1
-  } && parseRepo
-
-#git commit -am 'prep branchWhenOnMaster'
-#git push
-#
-#echo "TASK! working directory up to date with origin"
-##The --prune option removes remote-tracking branches that no longer exist on the
-#doTask=$( git pull --rebase --prune )
-#echo "DONE! ${doTask}"
-
-#exit
-##declare vars
-#REPO_BRANCHES_URL="$(node -pe "require('${GITHUB_REPO}')['branches_url']" | sed -r 's/\{.+//g')"
-#REPO_ISSUES_URL="$(node -pe "require('${GITHUB_REPO}')['issues_url']" | sed -r 's/\{.+//g')"
-#REPO_MILESTONES_URL="$(node -pe "require('${GITHUB_REPO}')['milestones_url']" | sed -r 's/\{.+//g')"
-#REPO_LABLELS_URL="$(node -pe "require('${GITHUB_REPO}')['labels_url']" | sed -r 's/\{.+//g')"
-#
-#echo "INFO!  *REPO_MILESTONES_URL*: [ ${REPO_MILESTONES_URL} ]"
-#echo "INFO!  *REPO_LABLELS_URL*: [ ${REPO_LABLELS_URL} ]"
-
-local chk=
-local doTask=
-
-echo "CHECK! all branches merged into master"
-chk=$( git branch --merged | grep -v '\*' )
-if [[ -z ${chk} ]] ; then
-    echo "YEP! branches are merged into master"
-else
-    echo "NOPE! all branches *not* merged into master"
-    echo "TASK! remove branches not merged into master"
-    doTask=$(
-    git branch --merged | grep -v '\*' | xargs -n 1 git branch -d
-    )
-    echo "DONE! removed branches not merged into master"
-fi
-
-echo "TASK! when on master branch fetch github issues"
-bin/gh get-issues
-
-parseFetchedIssues || return 1
-if [ $ISSUES_COUNT -eq 0 ] ; then
-  echo ''
-  branchCreateNewIssue && return 0 || return 1
-#recurse
-#  echo "INFO! return to fetch and select from issues"
-  #branchWhenOnMaster
-
-fi
-
-# on master select a issue to work on
-#   if there is no existing issue you want to work on
-#       create a new issue
-#   otherwise
-#       Fetch the issue
-# ISSUES_FOR_BRANCHES
-
-branchGetIssuesForBranches
-branchSelectIssueForBranch
-if [ -n "${BRANCH_SELECTED}" ] ; then
-  if [[ "$BRANCH_SELECTED" =  'CREATE_NEW_ISSUE' ]] ; then
-    branchCreateNewIssue  && return 0 || return 1
-  fi
-  parseBranchName ${BRANCH_SELECTED} || return 1
-  repoFetch "${REPO_ISSUES_URL}/${PARSED_ISSUE_NUMBER}" "${GITHUB_ISSUE}"
-  branchCreateBranch || return 1
-  #git status -sb --porcelain | head -1 | grep -oP '## master'
-  #echo 'TODO! - check if on master'
-  return 0
-else
-  echo "FAILURE! - no ISSUES_FOR_BRANCHES selected"
-  return 1
-fi
-
-}
-
 
 function omNewIssueMD(){
 cat << EOF
@@ -380,23 +290,6 @@ else
 fi
 }
 
-#function branchFetchIssues(){
-#echo "TASK! get issues from github that can become branches"
-#local chk=
-#local jsnGITHUB_ISSUES=
-#local labels="$( echo "${ISSUE_BRANCH_TYPES[@]}" | tr ' ' ',' )"
-## note param is label not labels
-## https://developer.github.com/v3/issues/
-## if issues list gets to big use more filters e.g. state and since
-#local URL="${REPO_ISSUES_URL}?label=${labels}"
-#repoFetch ${URL} ${GITHUB_ISSUES} || return 1
-#ISSUES_COUNT=$(
-# node -pe "J = require('${GITHUB_ISSUES}');\
-# R = require('ramda');\
-# R.length(J)"
-# )
-#echo "INFO! - *ISSUES_COUNT*: [ ${ISSUES_COUNT} ]"
-#}
 
 function omSetIssuesForBranches(){
 echo "TASK! from fetched issues set IssuesForBranches array"

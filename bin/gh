@@ -130,7 +130,6 @@ fi
 [ -n "${GIT_REPO_FULL_NAME}" ]  || exit 1
 API_REPO="${REPO_BASE_URL}/repos/${GIT_REPO_FULL_NAME}"
 DO="$(echo "$REQUEST" | sed -r 's/-(.+)//g' )"
-# echo "TASK! *DO* : [ $DO ]"
 #COLLECTION_NAME=
 #GET_COLLECTION=
 #if [ "$DO" = 'create' ] || [ "$DO" = 'delete' ] ; then
@@ -150,7 +149,7 @@ case "$REQUEST" in
   method='GET'
   requestURL="${API_REPO}"
   outFile="${JSN_REPO}"
-  thenDo='get-repo-lists'
+  # thenDo='get-repo-lists'
   ;;
   info-repo)
   params=( )
@@ -201,18 +200,7 @@ case "$REQUEST" in
   method='GET'
   requestURL="${REPO_BRANCHES_URL}/${BRANCH_SELECTED}"
   outFile="${JSN_BRANCH}"
-  ;;
-  create-branch-from-issue)
-  params=( )
-  branchInfo
-  exit
-  branchIsMaster ||  exit
-  parseIntoArrayIssuesForBranches || exit
-  inputSelectIssueForBranch  || exit
-  parseBranchName "${BRANCH_SELECTED}" || exit
-  omCreateBranch || exit
-  # gh 'get-current-issue'
-  exit
+  expectResponse=200
   ;;
   select-issue-for-branch)
   params=( )
@@ -352,7 +340,7 @@ case "$REQUEST" in
   new-issue-md)
   params=( )
   #parseFetchedIssues
-  omSetIssuesForBranches
+  # omSetIssuesForBranches
   omNewIssueMD
   exit
   ;;
@@ -385,15 +373,15 @@ case "$REQUEST" in
   labels="$( echo "${ISSUE_BRANCH_TYPES[@]}" | tr ' ' ',' )"
 ## note param is label not labels
 ## https://developer.github.com/v3/issues/
-## if issues list gets to big use more filters e.g. state and since
- URL="${REPO_ISSUES_URL}?state=open&label=${labels}"
+## if issues list gets to big use more filters e.g. state and since o
+  URL="${REPO_ISSUES_URL}?state=open&label=${labels}"
   method='GET'
   requestURL="${URL}"
-  outFile="${REPO_ISSUES_URL}"
+  outFile="${JSN_ISSUES}"
+  expectResponse=200
   ;;
   list-issues)
   params=( )
-  echo "$(<${JSN_ISSUES})" | jq '.'
   echo "$(<${JSN_ISSUES})" |\
   jq -r '["number", "title", "milestone", "label"],(.[] | [.number, .title, .milestone.description, .labels[0].name ]) | @sh '
   exit
