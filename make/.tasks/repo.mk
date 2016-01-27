@@ -7,6 +7,25 @@ ifeq ($(CURRENT_BRANCH),master)
 else
  isMaster = $(empty)
 endif
+#==========================================================
+ifneq ($(wildcard $(JSN_ISSUE)),)
+ ISSUE_NUMBER !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.number'
+ ISSUE_TITLE !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.title'
+ ISSUE_LABEL !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.labels[0] | .name'
+ ISSUE_NAME = $(subst $(space),-,$(ISSUE_LABEL) $(ISSUE_NUMBER) $(ISSUE_TITLE))
+endif
+
+ifneq ($(wildcard $(JSN_PULL_REQUEST)),)
+ PR_MERGED !=  echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.merged'    
+ PR_TITLE !=  echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.title'    
+ PR_MILESTONE_TITLE != echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.milestone | .title'    
+ PR_MILESTONE_DESCRIPTION != echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.milestone | .description'    
+ PR_HEAD_REFERENCE  != echo $$(<$(JSN_PULL_REQUEST)) | jq '.head | .ref'
+ PR_BODY !=  echo $$(<$(JSN_PULL_REQUEST)) | jq '.body | @sh'
+endif           
+
+
+#############################################################
 
 chkJson = $(shell [ -e $1 ] ||\
  if [ -e $(G)/headers/$(notdir $(basename $1)).txt ];\
@@ -83,11 +102,13 @@ $(G)/branch.json: $(G)/issue.json $(G)/issues.json
 
 pull-request: $(G)/pr-comments.json
 
-pr-comment: $(G)/pr-comment.json
+# pr-comment: $(G)/pr-comment.json
+# NOTE: do comment stuff manually for now
+# 
 
-pr-status:  $(JSN_PR_STATUSES)  $(JSN_PR_STATUS) $(JSN_PR_COMBINED_STATUS)
+pr-status:  $(G)/pr-combined-status.json  
 
-pr-merge: $(JSN_MERGE)
+pr-merge: $(G)/merge.json
 
 $(G)/pull-request.json: $(G)/branch.json
 	@echo "{{{##[ $@ ]##"
@@ -100,13 +121,6 @@ $(G)/pr-comments.json:  $(G)/pull-request.json
 	@gh get-pr-comments
 	$(call chkJson,$@)
 	@echo "}}}"
-
-# $(JSN_PR_STATUSES): $(JSN_PULL_REQUEST)
-# 	@echo "##[ $@ ]##"
-# ifneq ($(PR_MERGED),true)
-# 	@gh get-pr-statuses
-# endif
-# 	@echo "------------------------------------------------------------------ "
 
 $(G)/pr-comment.json: $(G)/pr-comments.json
 	@echo "{{{##[ $@ ]##"
@@ -132,8 +146,13 @@ $(G)/pr-comment.json: $(G)/pr-comments.json
 # endif
 	# @echo "}}}"
 
-# $(JSN_PR_STATUS): $(JSN_PR_STATUSES)
-# 	@echo "##[ $@ ]##"
+$(G)/pr-statuses.json: $(G)/pull-request.json
+	@echo "{{{##[ $@ ]##"
+	@gh get-pr-statuses
+	@echo "}}}"
+
+$(G)/pr-status.json: $(G)/pr-statuses.json
+# 	@echo "##[ $on ]##"
 # 	@echo "INPUT: $(JSN_PR_STATUSES)"
 # 	@echo $(WEBSITE)
 # 	@echo "if lints and test OK check OK! create default status for pull request"
@@ -146,28 +165,26 @@ $(G)/pr-comment.json: $(G)/pr-comments.json
 # 	@echo 'prove tap test. test written with tape'
 # 	@prove -o  t/analyze-css-metrics.t
 # 	@echo "Conditions meet, so create default suucess status "
-# 	gh create-pr-default-success-status
+	@gh create-pr-default-success-status
 # 	@echo "------------------------------------------------------------------ "
 
-# $(JSN_PR_COMBINED_STATUS): $(JSN_PR_STATUS)
+$(G)/pr-combined-status.json: $(G)/pr-status.json
 # 	@echo "##[ $@ ]##"
 # 	@echo "whenever we get a new status report fetch the combined status report"
-# 	gh get-pr-combined-status
+	gh get-pr-combined-status
 # 	@echo "------------------------------------------------------------------ "
 
-# $(JSN_MERGE): $(JSN_PR_COMBINED_STATUS)
-# 	@echo "##[ $@ ]##"
-# 	@echo "upon meeting conditions create release"
-# 	@echo "$$(<$<)" | jq '.state == "success"'
-# 	@echo "$$(<$<)" | jq '.total_count == 2'
-# 	@echo "$$(<$<)" | jq '.statuses | .[] | contains({"state":"success"})'
-# 	@echo "$$(<$<)" | jq 'contains({statuses: [{"description": "All good"}]})'
-# 	@echo "$$(<$<)" | jq '(.state == "success") and (contains({statuses: [{"description": "All  good"}]}))'
-# ifeq ($(shell echo $$(<$(JSN_PR_COMBINED_STATUS)) | jq '(.state == "success") and (contains({statuses: [{"description": "All good"}]}))'),true)
-# 	@echo "pull request combined status all ready to merge"
-# 	@gh merge-pull-request
-# endif
-# 	@echo "------------------------------------------------------------------ "
+$(G)/merge.json: $(G)/pr-combined-status.json
+	@echo "##[ $@ ]##"
+	@echo "if conditions not meet fail. below will eval to true or false "
+	@$$( echo "$$(<$<)" | jq '.state == "success"')
+	@$$( echo "$$(<$<)" | jq '.total_count == 1'  )
+	@$$( echo "$$(<$<)" | jq '.statuses | .[] | contains({"state":"success"})')
+	@$$( echo "$$(<$<)" | jq 'contains({statuses: [{"description": "All good"}]})')
+	@$$( echo "$$(<$<)" | jq '(.state == "success") and (contains({statuses: [{"description": "All good"}]}))')
+	@echo "pull request combined status all ready to merge"
+	@gh merge-pull-request
+	@echo "------------------------------------------------------------------ "
 
 
 

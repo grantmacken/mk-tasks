@@ -17,10 +17,12 @@ getTemplatesTestDir != [ -e  $(TEMPLATES_RELOADED_LOG) ] && \
  grep -oP '$(REPO)/\K.+(?=/(\w)+\.)'
 
 #############################################################
-templates: $(TEMPLATES) $(TEMPLATES_STORED_LOG) $(TEMPLATES_RELOADED_LOG)
+templates: $(TEMPLATES)
+
+reload-templates: $(TEMPLATES_STORED_LOG) $(TEMPLATES_RELOADED_LOG)
  #  $(TEMPLATES_STORED_LOG)  $(TEMPLATES_RELOADED_LOG) 
 watch-templates:
-	@watch -q $(MAKE) templates
+	@watch  $(MAKE) templates
 
 .PHONY:  watch-templates
 #############################################################
@@ -33,6 +35,7 @@ $(TEMPLATES_BUILD_DIR)/%.html: templates/%.html
  --break-before-br true --sort-attributes alpha  --doctype omit -xml $<
 	@tidy -q -utf8 -xml --indent true --indent-spaces 2 --hide-comments true $< > $@
 	@$(file > $(TEMPLATES_BUILT_LOG),$@)
+	@$(MAKE) reload-templates
 	@echo '---------------------------------------------------'
 
 $(TEMPLATES_STORED_LOG): $(TEMPLATES_BUILT_LOG)   

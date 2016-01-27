@@ -58,12 +58,13 @@ OUT_POSTS := $(POSTS_ARTICLES) $(POSTS_STORED_LOG) $(POSTS_RELOADED_LOG)
 CONTENT_PAGES_DIR := content/pages
 DATA_PAGES_DIR := $(DATA_DIR)/pages
 SRC_PAGES := $(call rwildcard,$(CONTENT_PAGES_DIR),*.md)
+# SRC_PAGES := $(shell find $(ICONS_SRC_DIR) -name '*.svg')
 PAGES_ARTICLES := $(patsubst $(CONTENT_PAGES_DIR)/%.md, $(DATA_PAGES_DIR)/%.xml, $(SRC_PAGES))
 PAGES_STORED_LOG := $(LOG_DIR)/pages-stored.log
 PAGES_RELOADED_LOG := $(LOG_DIR)/pages-reloaded.json
-OUT_PAGES :=  $(PAGES_ARTICLES) $(PAGES_STORED_LOG) $(PAGES_RELOADED_LOG)
+OUT_PAGES :=  $(PAGES_ARTICLES) $(PAGES_STORED_LOG) $(PAGES_RELOADED_LOG) 
 
-content: $(OUT_POSTS) $(OUT_PAGES)
+content: $(OUT_PAGES)
 
 watch-content:
 	@watch -q $(MAKE) content
@@ -73,6 +74,8 @@ watch-content:
 $(DATA_ARCHIVE_DIR)%.xml: $(SRC_POSTS)
 	@echo "## $@ ##"
 	@mkdir -p $(@D)
+	@mkdir -p $(TEMP_DIR)/$(dir $<)
+	@echo " ===  get front-matter from doc === "
 	@echo 'Check if there is already a post'
 	@echo '$(wildcard $@)'
 	@sed '1 { /^<!--/ { :a N; /\n-->/! ba; d} }' $(<)  >  $(TEMP_DIR)/$(notdir $(<))
@@ -165,7 +168,9 @@ $(DATA_PAGES_DIR)%.xml: $(CONTENT_PAGES_DIR)%.md
 	@echo "## $@ ##"
 	@echo "SRC $<"
 	@echo "OUT $@"
-	@mkdir -p $(@D)
+	@echo "in dir $(dir $<)"
+	@mkdir -p $(dir $@)
+	@mkdir -p $(TEMP_DIR)/$(dir $<)
 	@echo " ===  get front-matter from doc === "
 	@node -pe "\
  JSON.stringify(require('html-frontmatter')(require('fs').readFileSync('$(<)', 'utf-8')))" | \

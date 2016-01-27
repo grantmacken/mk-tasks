@@ -65,17 +65,16 @@ getMimeType = $(shell node -pe "\
 
 rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
 #}}}
-ifneq ($(wildcard $(TASKS_DIR)/*.mk),)
-  include $(TASKS_DIR)/help.mk
-  include $(TASKS_DIR)/modules.mk\
- $(TASKS_DIR)/templates.mk\
- $(TASKS_DIR)/styles.mk 
-  include $(TASKS_DIR)/build.mk
-  include $(TASKS_DIR)/repo.mk
+fo := $(TASKS_DIR)/repo.mk $(TASKS_DIR)/scripts.mk $(TASKS_DIR)/icons.mk 
+include $(filter-out $(fo) ,$(wildcard $(TASKS_DIR)/*.mk))
+include $(TASKS_DIR)/repo.mk
+# include $(TASKS_DIR)/modules.mk\
+# $(TASKS_DIR)/templates.mk\
+# $(TASKS_DIR)/styles.mk\
+# $(TASKS_DIR)/content.mk
 
-
- # include $(TASKS_DIR)/*.mk
-endif
+# include $(TASKS_DIR)/build.mk
+# include $(TASKS_DIR)/repo.mk
 
 default: help
 
