@@ -73,7 +73,7 @@ echo "TASK! put file and store xml response"
 local fileName=$( echo "${file}" | sed 's/.*\///')
 local ext=
 if [ -e  ${TEMP_XML} ] ; then
- rm ${TEMP_XML}
+ rm "${TEMP_XML}"
 fi
 return 1
 local doRequest=$(
@@ -103,10 +103,13 @@ function existPost(){
 $verbose && echo 'TASK! POST QUERY'
 $verbose && echo "INFO! TEMP_OUT: ${TEMP_XML}"
 # echo ${query}
+# import module namespace cm="http://markup.nz#cm" at "modules/lib/commonMark.xqm";
 local POST=$(
 cat << EOF
 <query xmlns="http://exist.sourceforge.net/NS/exist" start="1" max="${max}">
 <text><![CDATA[
+xquery version "3.0";
+import module namespace md="http://exist-db.org/xquery/markdown";
 ${query}
 ]]></text>
 </query>

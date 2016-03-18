@@ -36,7 +36,7 @@ chkJson = $(shell [ -e $1 ] ||\
 repo: $(G)/repo.json
 
 # TODO! incorp  gh default-labels and default milestones
-$(G)/repo.json:
+$(G)/repo.json:   config
 	@echo "{{{##[ $@ ]##"
 	@gh get-repo
 	@echo "}}}"

@@ -1,31 +1,46 @@
 #==========================================================
 #  XQUERY MODULES
-#==========================================================
+#  modules is the working directory for xquery modules
+#   before copying to the build dir run thru linters
+# 1. xq compile
+#
+# - when a file is copied to the build dirs 
+# - add file to built log 
+# - then invoke reload modules
+#
+# 1. Store xQuery file into eXist-db local development server and log eXist response
+# 2. Let livereload server know we have changed files and log tiny-lr server response
+# 3. Tap test with Prove Run any tests in test dir 
+#    Lint 
+#
+# #==========================================================
 SRC_MODULES := $(shell find modules -name '*.xq*' )
-MODULES_BUILD_DIR := $(BUILD_DIR)/modules
-MODULES := $(patsubst modules/%, $(MODULES_BUILD_DIR)/%, $(SRC_MODULES))
-MODULES_BUILT_LOG   := $(LOG_DIR)/modules-built.log
-MODULES_STORED_LOG   := $(LOG_DIR)/modules-stored.log
-MODULES_RELOADED_LOG := $(LOG_DIR)/modules-reloaded.log 
-MODULES_TESTED_LOG := $(LOG_DIR)/modules-tested.log 
+MODULES_BUILD_DIR := $(B)/modules
+MODULES := $(patsubst modules/%, $(B)/modules/%, $(SRC_MODULES))
+MODULES_BUILT_LOG   := $(L)/modules-built.log
+MODULES_STORED_LOG   := $(L)/modules-stored.log
+MODULES_RELOADED_LOG := $(L)/modules-reloaded.log 
+MODULES_TESTED_LOG := $(L)/modules-tested.log 
 #############################################################
 
-loggedModuleBuiltFile != [ -e  $(MODULES_BUILT_LOG) ] && \
- tail -1 $(MODULES_BUILT_LOG)
+loggedModuleBuiltFile != [ -e  $(L)/modules-built.log ] && \
+ tail -1 $(L)/modules-built.log
 
-getModulesTestDir != if [ -e  $(MODULES_RELOADED_LOG) ] ; then\
- echo $$(< $(MODULES_RELOADED_LOG)) | jq -r '.files[0]' |\
- grep -oP '$(REPO)/\K.+(?=/(\w)+\.)'; fi  
+xqCompile = $(shell xq compile '$(abspath $1)')
 
-modules: $(MODULES) 
-   
-reload-modules: $(MODULES_RELOADED_LOG)
+# getModulesTestDir != if [ -e  $(MODULES_RELOADED_LOG) ] ; then\
+#  echo $$(< $(MODULES_RELOADED_LOG)) | jq -r '.files[0]' |\
+#  grep -oP '$(REPO)/\K.+(?=/(\w)+\.)'; fi
 
-test-modules: $(MODULES_TESTED_LOG)
+modules: $(MODULES)
+
+reload-modules: $(L)/modules-reloaded.log
+
+# test-modules: $(MODULES_TESTED_LOG)
 
 #for testing  use: make watch-modules
 watch-modules:
-	@watch -q $(MAKE) modules 
+	@watch -q $(MAKE) modules
 
 .PHONY:  watch-modules
 
@@ -33,19 +48,24 @@ watch-modules:
 
 # Copy over xquery modules
 # 
-#  @xqlint $<   
+#  @xqlint $<  
+# before 
+#
 
-$(MODULES_BUILD_DIR)/%: modules/%
+$(B)/modules/%: modules/%
 	@echo "## $@ ##"
 	@mkdir -p $(@D)
+	@$(if $(call xqCompile ,$<),\
+ $(shell echo  '$(abspath $<)$(call xqCompile ,$<) ' >&2 ; false) ,\
+ $(info lint - $< : OK ))
 	@cp $< $@
 	@echo 'copied files into build directory'
 	@echo 'add file to built log then invoke reload modules'
-	@$(file > $(MODULES_BUILT_LOG),$@)
+	@$(file > $(L)/modules-built.log,$@)
 	@$(MAKE) reload-modules
 	@echo '-----------------------------------------------------------------'
 
-$(MODULES_STORED_LOG): $(MODULES_BUILT_LOG)
+$(L)/modules-stored.log: $(L)/modules-built.log
 	@echo "## $@ ##"
 	@echo "Store resource into our eXist local dev server\
  so we get a live preview"
@@ -61,10 +81,9 @@ $(MODULES_STORED_LOG): $(MODULES_BUILT_LOG)
  '$(abspath  $(subst /$(subst build/,,$(loggedModuleBuiltFile)),,$(loggedModuleBuiltFile)))' \
  '$(subst build/,,$(loggedModuleBuiltFile))' '$(call getMimeType,$(suffix $(notdir $(loggedModuleBuiltFile))))' \
  '$(basename $(notdir $@))'
-	@tail -n 1  $@
 	@echo '-----------------------------------------------------------------'
 
-$(MODULES_RELOADED_LOG): $(MODULES_STORED_LOG)
+$(L)/modules-reloaded.log: $(L)/modules-stored.log
 	@echo "## $@ ##"
 	@echo "Let livereload server know we have changed files"
 	@echo "input log: $<"
@@ -74,16 +93,16 @@ $(MODULES_RELOADED_LOG): $(MODULES_STORED_LOG)
 	@echo '-----------------------------------------------------------------'
 
 
-$(MODULES_TESTED_LOG): $(MODULES_RELOADED_LOG)
-	@echo "## $@ ##"
-	@mkdir -p  t/$(getModulesTestDir)
-	@echo -n "... look in '"
-	@echo -n "t/$(getModulesTestDir)"  
-	@echo "' for test plans"
-	@$(if $(wildcard t/$(getModulesTestDir)/*.js),\
- casperjs test  $(wildcard t/$(getModulesTestDir)/*.js)  2>/dev/null,)
-	@echo "prove ...."
-	@echo "input log: $<"
-	@echo "output log: $@"
-	echo '-----------------------------------------------------------------'
+# $(L)/modules-tested.log: $(L)/modules-reloaded.log
+# @echo "## $@ ##"
+# @mkdir -p  t/$(getModulesTestDir)
+# @echo -n "... look in '"
+# @echo -n "t/$(getModulesTestDir)"  
+# @echo "' for test plans"
+# @$(if $(wildcard t/$(getModulesTestDir)/*.js),\
+# casperjs test  $(wildcard t/$(getModulesTestDir)/*.js)  2>/dev/null,)
+# @echo "prove ...."
+# @echo "input log: $<"
+# @echo "output log: $@"
+# echo '-----------------------------------------------------------------'
 

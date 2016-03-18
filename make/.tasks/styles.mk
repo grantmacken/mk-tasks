@@ -30,7 +30,7 @@ STYLES_TESTED :=   $(LOG_DIR)/phantomas.json
 STYLES_UPLOADED_LOG :=   $(LOG_DIR)/css-uploaded.log
 
 #############################################################
-styles: $(STYLES) $(STYLES_STORED_LOG)  $(STYLES_RELOADED_LOG) $(STYLES_TESTED)
+styles: $(L)/styles-reloaded.log
 
 styles-help:
 	@touch $(STYLE_MAIN)
@@ -62,7 +62,7 @@ test-styles:
 # @cssnext --compress $(<) $@
 #############################################################
 
-build/resources/styles/main.css: $(STYLE_MAIN) $(STYLE_IMPORTS)
+$(B)/resources/styles/main.css: $(STYLE_MAIN) $(STYLE_IMPORTS)
 	@echo "## $@ ##"
 	@mkdir -p $(dir $@)
 	@echo $@
@@ -75,7 +75,7 @@ build/resources/styles/main.css: $(STYLE_MAIN) $(STYLE_IMPORTS)
 	@cssfmt $@
 	@echo '-----------------------------------------------------------------'
 
-$(STYLES_STORED_LOG): $(OUT_STYLES)
+$(L)/styles-stored.log: build/resources/styles/main.css
 	@echo "## $@ ##"
 	@echo "Store resource into our eXist local dev server\
  so we get a live preview"
@@ -93,7 +93,7 @@ $(STYLES_STORED_LOG): $(OUT_STYLES)
 	@tail -n 1  $@
 	@echo '-----------------------------------------------------------------'
 
-$(STYLES_RELOADED_LOG): $(STYLES_STORED_LOG)
+$(L)/styles-reloaded.log: $(L)/styles-stored.log
 	@echo "## $@ ##"
 	@echo "Let livereload server know we have changed files"
 	@echo "input log: $<"
@@ -102,7 +102,7 @@ $(STYLES_RELOADED_LOG): $(STYLES_STORED_LOG)
 	@curl -s --ipv4  http://localhost:35729/changed?files=$(shell tail -n 1 $<) > $@
 	@echo '-----------------------------------------------------------------'
 
-$(STYLES_TESTED): $(STYLES_RELOADED_LOG)
+$(L)/styles-tested.log: $(L)/styles-reloaded.log
 	@echo "## $@ ##"
 	@echo "prove with phantomas"
 	@echo "input log: $<"

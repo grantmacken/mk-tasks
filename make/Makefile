@@ -2,6 +2,13 @@ include config
 include ../common.properties
 SHELL=/bin/bash
 export PATH := $(abspath $(BIN_DIR)):$(abspath $(NODE_BIN_DIR)):$(PATH)
+# dir shortcuts
+T := .temp
+G := .github
+L := .logs
+B := build
+D := deploy
+
 #{{{
 # Make sure we have the following apps installed:
 APP_LIST = git curl node expect tidy
@@ -14,11 +21,7 @@ else
   TINY-LR_UP :=
 endif
 
-ifeq ($(wildcard $(SEMVER_FILE)),)
- $(file > $(SEMVER_FILE),v0.0.0)
-endif
-
-VERSION != echo "$$(<$(SEMVER_FILE))" | sed 's/v//'
+VERSION != echo "$(SEMVER)" | sed 's/v//'
 XAR != echo "$(DEPLOY_DIR)/$(ABBREV)-$(VERSION).xar"
 
 ifeq ($(TRAVIS_BRANCH),)
@@ -65,7 +68,7 @@ getMimeType = $(shell node -pe "\
 
 rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
 #}}}
-fo := $(TASKS_DIR)/repo.mk $(TASKS_DIR)/scripts.mk $(TASKS_DIR)/icons.mk 
+fo := $(TASKS_DIR)/repo.mk $(TASKS_DIR)/scripts.mk $(TASKS_DIR)/icons.mk
 include $(filter-out $(fo) ,$(wildcard $(TASKS_DIR)/*.mk))
 include $(TASKS_DIR)/repo.mk
 # include $(TASKS_DIR)/modules.mk\

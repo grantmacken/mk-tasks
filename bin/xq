@@ -4,6 +4,7 @@
 #
 ###########################################
 source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+
 source "../common.properties"
 source "../project.properties"
 IMPORTS="${BIN_DIR}/xq-includes"
@@ -114,7 +115,24 @@ fi
 #   boolean, string, etc
 $verbose  && echo "INFO! - *QUERY* [ ${QUERY} ]"
 case "$QUERY" in
-#LIST-START#
+	#LIST-START#
+	compile)
+	params=( string )
+	# echo xmldb:exist:///db/${APP_PATH}
+	query="(util:compile(file:read('$1'),'xmldb:exist:///db/${APP_PATH}'))"
+	returns='err'
+	;;
+	compile2)
+	params=( string )
+	echo xmldb:exist:///db/${APP_PATH}
+	query="(util:compile-query(file:read('$1'),'xmldb:exist:///db/${APP_PATH}'))"
+	returns='item'
+	;;
+  md-parse)
+  params=( string )
+	query="(md:parse('$1'))"
+  returns='item'
+  ;;
   exec)
   params=( )
   query="(process:execute(('dig','+short', 'gmack.nz'), <options/>))"
@@ -124,16 +142,6 @@ case "$QUERY" in
   params=( )
   query="(util:log-system-out('this is a system-out log message'))"
   returns='journal_log'
-  ;;
-  put-stored-post)
-  params=( )
-  query=
-  returns='string'
-  ;;
-  get-stored-post)
-  params=()
-  query=
-  returns='string'
   ;;
   delete-collection)
   params=( route )
@@ -429,27 +437,6 @@ if [[ ${#params[@]} -ne ${#ARGS[@]} ]] ; then
   exit 1
 fi
 
-# if [ ${QUERY} = 'put-stored-post' ] ; then
-#   echo "${QUERY}"
-#   lastLine=$( tail -n 1 ${POSTS_STORED_LOG} )
-#   localFile=$( echo ${lastLine} | cut -d ' ' -f 1 )
-#   remotePath=$( echo ${lastLine} | cut -d ' ' -f 2 )
-#   echo ${remotePath}
-#   existPUT
-#   exit
-# fi
-# if [ ${QUERY} = 'get-stored-post' ] ; then
-#   echo "${QUERY}"
-#   lastLine=$( tail -n 1 ${POSTS_STORED_LOG} )
-#   localFile=$( echo ${lastLine} | cut -d ' ' -f 1 )
-#   remotePath=$( echo ${lastLine} | cut -d ' ' -f 2 )
-#   echo ${remotePath}
-#   existGET
-#   cat ${TEMP_XML}
-#   exit
-# fi
-
-
 #echo ${query}
 # a call to existQuery will return success or failure
 # if 200 response and TEMP.xml is written to then
@@ -514,6 +501,27 @@ case "$returns" in
   echo "OK! - empty response expected"
   echo "SUCCESS! - "
   ;;
+	item)
+	response=$(
+  node -pe "\
+  n = require('cheerio').load('$(echo $(<${TEMP_XML}))');\
+	n('*').html()"
+	)
+	$verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+	echo "$response" > ${STRING_RESPONSE}
+	;;
+	err)
+	#	http://www.gnu.org/prep/standards/standards.html#Errors
+	#	sourcefile:lineno.column: message
+	response=$(
+		echo $(<${TEMP_XML}) |
+		cheerio exist\\:value | sed -r 's/\&apos;/"/g' |
+		perl -ne \
+ 's/.+err:[A-Z-0-9]{1,9}(.+)\[at line ([\d]{1,5}), column ([\d]{1,3}).?\]/:$2:$3: Warning: $1/ and print'
+		)
+	$verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+	 echo "$response" > ${STRING_RESPONSE}
+	;;
   string)
   response=$(
     echo $(<${TEMP_XML}) |

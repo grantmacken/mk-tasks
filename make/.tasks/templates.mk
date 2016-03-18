@@ -22,8 +22,9 @@ templates: $(TEMPLATES)
 reload-templates: $(TEMPLATES_STORED_LOG) $(TEMPLATES_RELOADED_LOG)
  #  $(TEMPLATES_STORED_LOG)  $(TEMPLATES_RELOADED_LOG) 
 watch-templates:
-	@watch  $(MAKE) templates
+	@watch -q $(MAKE) templates
 
+# tidy -q --doctype omit --accessibility-check 1 --show-errors 6 --show-info 1 --show-warnings 1 --gnu-emacs 1 $<
 .PHONY:  watch-templates
 #############################################################
 

@@ -15,7 +15,7 @@
     "xray": "latest",
     "x-ray-phantom": "latest",
     "make-livereload": "latest",
-    "xqlint": "latest",
+    "xqlint": "https://github.com/grantmacken/xqlint.git",
     "markdown-it": "latest",
     "markdown-it-container": "latest",
     "html-frontmatter": "latest",

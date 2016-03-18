@@ -366,22 +366,14 @@ else
   #return 1
 fi
 
-if [ -e ${SEMVER_FILE} ] ; then
-  SEMVER=$(<${SEMVER_FILE})
-  echo "INFO! *CURRENT_SEMVER* [ ${SEMVER} ]"
-fi
-
 if [ "${SEMVER}" = "${LATEST_TAG}" ] ; then
   echo "INFO! *CURRENT_SEMVER* - ${SEMVER} equals *LATEST_TAG* - ${LATEST_TAG} "
-# echo "${RELEASE_NEW_VERSION}" > ${SEMVER_FILE}
 else
   echo "INFO! *CURRENT_SEMVER* - ${SEMVER} not equal to *LATEST_TAG* - ${LATEST_TAG}"
 fi
 
 if [ "${RELEASE_TAG_NAME}" = "${LATEST_TAG}" ] ; then
   echo "INFO! *RELEASE_TAG_NAME* - ${RELEASE_TAG_NAME} equals *LATEST_TAG* - ${LATEST_TAG} "
-# echo "${RELEASE_NEW_VERSION}" > ${SEMVER_FILE}
-  #return 1
 else
   echo "INFO! *RELEASE_TAG_NAME* - ${RELEASE_TAG_NAME} not equal to *LATEST_TAG* - ${LATEST_TAG}"
 fi
@@ -494,7 +486,9 @@ echo "${newVer}"
 
 
 omUpdateSemver(){
-[ -e ${SEMVER_FILE} ]  && SEMVER=$(<${SEMVER_FILE}) 
+# TODO! 
+echo 'todo semver now in properties files'
+return 1    :
 # depends on
 [ -z "${LATEST_TAG}" ] &&  parseTags  > /dev/null
 [ -z "${PR_MILESTONE_TITLE}" ] && parsePullRequest 
@@ -559,12 +553,9 @@ if [ -n "$( git tag | grep ${RELEASE_NEW_VERSION} )" ] ; then
    echo 'FAILURE!  release already exists '
    exit 1
 fi
-
-
+ #TODO!
 if [ ! "${SEMVER}" = "${RELEASE_NEW_VERSION}" ] ; then
  echo "${RELEASE_NEW_VERSION}" > ${SEMVER_FILE}
 fi
-
-
 }
 
