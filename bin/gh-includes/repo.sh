@@ -29,26 +29,26 @@ function repoLists(){
   done
 }
 
-function repoFetch(){                             
-local url=$1
-local file=$2
-local fileName="$( echo "${file}" | sed 's%.*/%%')"
-local baseName="$( echo "${fileName}" | cut -d. -f1 )"
-#local basePath="$( echo "${file}" | sed 's%fileName%%')"
-local headerDump="${GITHUB_DIR}/headers/${baseName}.txt"
-local eTagFile="${GITHUB_DIR}/etags/${baseName}.etag"
-local message=
-#repoRemoveFile "${file}"
-echo "TASK! from github, fetch and store reponse"
-echo "INFO! - *GET URL* : [ ${url} ]"
-echo "INFO! - *RESPONSE FILE* : [ ${fileName} ]"
-echo "INFO! - *fileName* : [ ${fileName} ]"
-echo "INFO! - *baseName* : [ ${baseName} ]"
-echo "INFO! - *headerDump* : [ ${headerDump} ]"
-echo "INFO! - *eTagFile* : [ ${eTagFile} ]"
-[ -n "${fileName}" ] ||  return 1
-[ -n "${url}" ] || return 1
-[ -n "${file}" ] || return 1
+function repoFetch(){
+  local url=$1
+  local file=$2
+  local fileName="$( echo "${file}" | sed 's%.*/%%')"
+  local baseName="$( echo "${fileName}" | cut -d. -f1 )"
+  #local basePath="$( echo "${file}" | sed 's%fileName%%')"
+  local headerDump="${GITHUB_DIR}/headers/${baseName}.txt"
+  local eTagFile="${GITHUB_DIR}/etags/${baseName}.etag"
+  local message=
+  #repoRemoveFile "${file}"
+  echo "TASK! from github, fetch and store reponse"
+  echo "INFO! - *GET URL* : [ ${url} ]"
+  echo "INFO! - *RESPONSE FILE* : [ ${fileName} ]"
+  echo "INFO! - *fileName* : [ ${fileName} ]"
+  echo "INFO! - *baseName* : [ ${baseName} ]"
+  echo "INFO! - *headerDump* : [ ${headerDump} ]"
+  echo "INFO! - *eTagFile* : [ ${eTagFile} ]"
+  [ -n "${fileName}" ] ||  return 1
+  [ -n "${url}" ] || return 1
+  [ -n "${file}" ] || return 1
 
 #grep -oP '^ETag: \K["\w]+'
 

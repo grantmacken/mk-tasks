@@ -26,7 +26,7 @@ then
     return 1
   fi
 ellse
-  returnll 1
+  return 1
 fi
 }
 
@@ -102,20 +102,26 @@ fi
 function existPost(){
 $verbose && echo 'TASK! POST QUERY'
 $verbose && echo "INFO! TEMP_OUT: ${TEMP_XML}"
+local max=9999
 # echo ${query}
 # import module namespace cm="http://markup.nz#cm" at "modules/lib/commonMark.xqm";
 local POST=$(
 cat << EOF
-<query xmlns="http://exist.sourceforge.net/NS/exist" start="1" max="${max}">
+<query xmlns="http://exist.sourceforge.net/NS/exist"
+	start="1"
+	max="${max}">
 <text><![CDATA[
-xquery version "3.0";
+xquery version "3.1";
 import module namespace md="http://exist-db.org/xquery/markdown";
+import module namespace inspect = "http://exist-db.org/xquery/inspection";
+import module namespace test="http://exist-db.org/xquery/xqsuite" at "resource:org/exist/xquery/lib/xqsuite/xqsuite.xql";
+${import}
 ${query}
 ]]></text>
 </query>
 EOF
 )
-# echo "$POST"
+ # echo "$POST"
 if [ -e  ${TEMP_XML} ] ; then
  rm ${TEMP_XML}
 fi

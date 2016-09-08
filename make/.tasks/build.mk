@@ -1,6 +1,5 @@
-
-###############################################################################
 # BUILD PHASE
+###############################################################################
 # pull request merged and now on master:
 # update semver TODO! discuss how this is done
 # update config
@@ -15,35 +14,43 @@
 # BUILD TARGET PATTERNS
 #==========================================================
 
-SRC_PKG_TMPL := $(PKG_DIR)/repo.xml $(PKG_DIR)/expath-pkg.xml
-PKG_TEMPLATES := $(patsubst $(PKG_DIR)/%, $(BUILD_DIR)/%, $(SRC_PKG_TMPL))
-SRC_PKG_XQ := $(shell find $(PKG_DIR) -name '*.xq*')
-SRC_PKG_XCONF := $(shell find $(PKG_DIR) -name '*.xconf*')
+SRC_PKG_TMPL := $(P)/repo.xml $(P)/expath-pkg.xml
+PKG_TEMPLATES := $(patsubst $(P)/%, $(B)/%, $(SRC_PKG_TMPL))
+SRC_PKG_XQ := $(shell find $(P) -name '*.xq*')
+SRC_PKG_XCONF := $(shell find $(P) -name '*.xconf*')
 SRC_PKG_MAIN := $(SRC_PKG_XCONF) $(SRC_PKG_XQ)
-PKG_MAIN := $(patsubst $(PKG_DIR)/%, $(BUILD_DIR)/%, $(SRC_PKG_MAIN))
+PKG_MAIN := $(patsubst $(P)/%, $(B)/%, $(SRC_PKG_MAIN))
 
-build: $(PKG_TEMPLATES) $(PKG_MAIN) $(TEMPLATES) $(MODULES) $(STYLES)
+# $(info $(PKG_MAIN))
+.PHONY: pre-build package-clean
+
+pre-build:
+	@mkdir -p $(B)/modules/{api,lib,render} 
+	@mkdir -p $(B)/templates/{pages,includes} 
+	@echo 'copy over essential api modules'
+	@cp  modules/api/* $(B)/modules/api 
+	@echo 'copy over essential lib modules'
+	@cp modules/lib/archive.xqm $(B)/modules/lib
+	@cp modules/lib/note.xqm $(B)/modules/lib
+	@echo 'copy over essential home page template'
+	@cp templates/pages/home.html $(B)/templates/pages
+	@echo 'copy over essential include templates'
+	@cp templates/includes/head.html $(B)/templates/includes
+	@echo 'copy render modules called in *includes* for home-page '
+	@cp modules/render/* $(B)/modules/render
+
+
+build: $(PKG_TEMPLATES) $(PKG_MAIN)
+
+# $(TEMPLATES) $(MODULES) $(STYLES)
 
 package: $(XAR)
 
-# $(SEMVER_FILE): $(JSN_MERGE)
-# 	@echo "##[ $@ ]##"
-# 	@echo "upon merge create a new semver file for release"
-# ifeq ($(PR_MERGED),true)
-# 	@echo  $(PR_MERGED)
-# 	@echo  $(PR_MILESTONE_TITLE)
-# 	@gh update-semver "$$(xq -r app-semver | sed 's/v//' )" "$(PR_MILESTONE_TITLE)" | tee  $@
-# endif
-
-# $(CONFIG_FILE): $(SEMVER_FILE)
-# 	@echo "##[ $@ ]##"
-# 	@echo "whenever semver changes touch config so we get a fresh build"
-# 	@echo "$$(<$@)"
-# 	@touch $@
-# 	@echo "------------------------------------------------------------------ "
+package-clean: 
+	@rm $(XAR)
 
 # use cheerio as simple xml parser
-$(BUILD_DIR)/repo.xml: $(PKG_DIR)/repo.xml $(CONFIG_FILE) $(SEMVER_FILE)
+$(B)/repo.xml: $(P)/repo.xml $(CONFIG_FILE)
 	@echo "##[ $@ ]##"
 	@echo  "SRC  $< "
 	@node -e "\
@@ -54,10 +61,12 @@ $(BUILD_DIR)/repo.xml: $(PKG_DIR)/repo.xml $(CONFIG_FILE) $(SEMVER_FILE)
  n('author').text('$(AUTHOR)');\
  n('website').text('$(WEBSITE)');\
  n('target').text('$(NAME)');\
+ n('permissions').attr('user','$(ABBREV)');\
+ n('permissions').attr('group','$(ABBREV)');\
  require('fs').writeFileSync('./$@', n.xml() )"
 	@echo "------------------------------------------------------------------ "
 
-$(BUILD_DIR)/expath-pkg.xml: $(PKG_DIR)/expath-pkg.xml $(CONFIG_FILE)  $(SEMVER_FILE)
+$(B)/expath-pkg.xml: $(P)/expath-pkg.xml $(CONFIG_FILE)
 	@echo  "MODIFY $@"
 	@echo "##[ $@ ]##"
 	@echo  "SRC  $< "
@@ -75,7 +84,7 @@ $(BUILD_DIR)/expath-pkg.xml: $(PKG_DIR)/expath-pkg.xml $(CONFIG_FILE)  $(SEMVER_
 
 
 # Copy over package root files
-$(BUILD_DIR)/%: $(PKG_DIR)/%
+$(B)/%: $(P)/%
 	@mkdir -p $(dir $@)
 	@echo "FILE $@ $<"
 	@cp $< $@
@@ -84,11 +93,11 @@ $(BUILD_DIR)/%: $(PKG_DIR)/%
 # Create package with zip
 # but exclude the data dir
 # TODO! might also exclude binary media
-$(XAR): $(wildcard $(BUILD_DIR)/* )
+$(XAR): $(wildcard $(B)/* )
 	@echo "##[ $@ ]##"
 	@mkdir -p $(dir $@)
 	@echo "XAR FILE $@"
-	@cd $(BUILD_DIR); zip -r ../$@ . -x 'data*'
+	@cd $(B); zip -r ../$@ . -x 'data/archive/*' 'data/pages/*'
 	@echo "------------------------------------------------------------------ "
 
 test-packaging:

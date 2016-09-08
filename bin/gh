@@ -671,7 +671,7 @@ EOF
   params=( )
   parsePullRequest >  /dev/null
   echo "INFO! *PR_COMMENTS_URL*: [${PR_COMMENTS_URL}]"
-  txt=":shipit: approve"
+  txt=":shipit:  LGTM"
   jsn="{\"body\":\"${txt}\"}"
   method='POST'
   requestURL="${PR_COMMENTS_URL}"

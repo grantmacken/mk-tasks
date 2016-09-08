@@ -1,10 +1,8 @@
 #!/bin/bash +x
 ###########################################
 # xq some bash scripts fo working with exist-db
-#
 ###########################################
 source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
-
 source "../common.properties"
 source "../project.properties"
 IMPORTS="${BIN_DIR}/xq-includes"
@@ -64,6 +62,7 @@ done
 ARGUMENTS=$#
 QUERY=
 query=
+import=
 queryFile=
 returns=
 response=
@@ -84,7 +83,7 @@ APP_PATH="apps/${NAME}"
 #echo "INFO! - *KNOWN_USER* [ ${KNOWN_USER} ]"
 #echo "INFO! - *KNOWN_PASS* [ ${KNOWN_PASS} ]"
 [ -d ${TEMP_DIR}/xq ] || mkdir -p ${TEMP_DIR}/xq
-[ -d ${LOG_DIR}/xq ]  || mkdir -p ${LOG_DIR}/xq
+[ -d q${LOG_DIR}/xq ]  || mkdir -p ${LOG_DIR}/xq
 TEMP_XML=${TEMP_DIR}/xq/${QUERY}.xml
 LOG_FILE=${LOG_DIR}/xq/${QUERY}.log
 $verbose  && echo "#${QUERY}#"
@@ -115,21 +114,193 @@ fi
 #   boolean, string, etc
 $verbose  && echo "INFO! - *QUERY* [ ${QUERY} ]"
 case "$QUERY" in
-	#LIST-START#
-	compile)
-	params=( string )
-	# echo xmldb:exist:///db/${APP_PATH}
-	query="(util:compile(file:read('$1'),'xmldb:exist:///db/${APP_PATH}'))"
-	returns='err'
+	#LIST-START
+	get)
+	params=( route )
+	relPath=$1
+	url="http://${HOST}:8080/exist/restxq/${NAME}/${relPath}"
+  $verbose  && echo "url  [ ${url}"
+  doRequest=$(
+curl -s \
+  -X GET \
+  -H "Content-Type: text/xml" \
+  -u "${KNOWN_USER}:${KNOWN_PASS}" \
+  -o ${TEMP_XML} \
+  -w "%{http_code}" \
+  ${url}
+)
+  $verbose  && echo "request  [ ${doRequest} ]"
+  cat ${TEMP_XML}
+  exit
 	;;
-	compile2)
+	list-modules)
+	params=( )
+	query="util:registered-modules()" 
+	returns='list'
+	;;
+	list-functions)
+	params=( namespace_uri )
+	query="util:registered-functions( \"$1\" )"
+	returns='list'
+	;;
+	describe-function)
+	params=( function_name  )
+	query="util:describe-function( xs:QName(\"$1\") )"
+	returns='element'
+	;;
+	inspect-mod-funcs)
+	params=( uri )
+	echo xmldb:exist:///db/${APP_PATH}
+	query="inspect:inspect-module-uri(xs:anyURI('$1'))"
+	returns='element'
+	;;
+	inspect)
 	params=( string )
 	echo xmldb:exist:///db/${APP_PATH}
-	query="(util:compile-query(file:read('$1'),'xmldb:exist:///db/${APP_PATH}'))"
-	returns='item'
+	query="inspect:inspect-module(xs:anyURI('xmldb:exist:///db/${APP_PATH}/modules/lib/$1.xqm'))"
+	returns='element'
 	;;
-  md-parse)
-  params=( string )
+	inspect3)
+	params=( string )
+	absPath=$1
+	relPath=$( echo "$1" | grep -oP '^.+\Kmodules/.+$' )
+	modulePath=$( dirname "$1" | grep -oP '^.+\Kmodules/.+$' )
+	baseName=$( basename $1 )
+	appPath="xmldb:exist:///db/${APP_PATH}/$modulePath"
+	echo ${appPath}
+	echo ${modulePath}
+	echo ${modulePath}
+	# import="import module namespace muURL = \"http://markup.co.nz/#muURL\" at \"$appPath/muURL.xqm\";"
+	query="inspect:inspect-module(xs:anyURI(\"$appPath/$baseName\"))"
+	returns='element'
+	;;
+	register)
+	params=( route )
+	absPath=$(readlink -f $1)
+	relPath=$( echo "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+	path="/db/${APP_PATH}/${relPath}"
+  import='import module namespace exrest="http://exquery.org/ns/restxq/exist" at  "java:org.exist.extensions.exquery.restxq.impl.xquery.exist.ExistRestXqModule";'
+  $verbose  && echo "absPath  [ ${absPath}"
+  $verbose  && echo "relPath  [ ${relPath} ]"
+  $verbose  && echo "import  [ ${import} ]"
+	query="(exrest:register-module(xs:anyURI('$path')))"
+	returns='documentNode'
+	;;
+  deregister)
+	params=( route )
+	absPath=$(readlink -f $1)
+	relPath=$( echo "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+	path="/db/${APP_PATH}/${relPath}"
+  import='import module namespace exrest="http://exquery.org/ns/restxq/exist" at  "java:org.exist.extensions.exquery.restxq.impl.xquery.exist.ExistRestXqModule";'
+  $verbose  && echo "path  [ ${path} ]"
+  $verbose  && echo "import  [ ${import} ]"
+	query="(exrest:deregister-module(xs:anyURI('$path')))"
+	returns='documentNode'
+  ;;
+  register-find)
+  params=( route )
+  absPath=$(readlink -f $1)
+  relPath=$( echo "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+	path="/db/${APP_PATH}/${relPath}"
+  import='import module namespace exrest="http://exquery.org/ns/restxq/exist" at  "java:org.exist.extensions.exquery.restxq.impl.xquery.exist.ExistRestXqModule";'
+  $verbose  && echo "absPath  [ ${absPath}"
+  $verbose  && echo "relPath  [ ${relPath} ]"
+  $verbose  && echo "import  [ ${import} ]"
+  query="(exrest:find-resource-functions(xs:anyURI('$path')))"
+  returns='documentNode'
+  ;;
+  register-func)
+  params=( route signiture )
+  absPath=$(readlink -f $1)
+  relPath=$( echo "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+  path="xmldb:exist:///db/${APP_PATH}/${relPath}"
+  set +B
+  sig="{http://$NAME/#posts}$2"
+  import='import module namespace exrest="http://exquery.org/ns/restxq/exist" at  "java:org.exist.extensions.exquery.restxq.impl.xquery.exist.ExistRestXqModule";'
+  $verbose  && echo "absPath  [ $absPath"
+  $verbose  && echo "relPath  [ $relPath ]"
+  $verbose  && echo "import  [ $import ]"
+  $verbose  && echo "sig  [ $sig ]"
+  query="(exrest:register-resource-function(xs:anyURI('$path'), '$sig'))"
+  $verbose  && echo "query - $sig ]"
+  returns='boolean'
+  ;;
+  deregister-func)
+  params=( route signiture )
+  absPath=$(readlink -f $1)
+  relPath=$( echo "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+  path="xmldb:exist:///db/${APP_PATH}/${relPath}"
+  import='import module namespace exrest="http://exquery.org/ns/restxq/exist" at  "java:org.exist.extensions.exquery.restxq.impl.xquery.exist.ExistRestXqModule";'
+  $verbose  && echo "absPath  [ ${absPath}"
+  $verbose  && echo "relPath  [ ${relPath} ]"
+  $verbose  && echo "import  [ ${import} ]"
+  query="(exrest:deregister-resource-function(xs:anyURI('$path'), '$2'))"
+  returns='documentNode'
+  ;; 
+	compile)
+	params=( string )
+	absPath=$(readlink -f $1)
+	relPath=$( echo "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+	modulePath=$( dirname "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+	appPath="xmldb:exist:///db/${APP_PATH}/$modulePath"
+	query="(util:compile(file:read('$absPath'),'$appPath'))"
+	returns='err'
+	;;
+	prove)
+	params=( path )
+  # path may be  either the testsuite or the module
+	modulePath=$( dirname "$1" | sed s%tests/%%g ) 
+	moduleType=$( echo "$modulePath" | cut -d/ -f2 ) 
+  log="${LOG_DIR}/$( echo "$1" | grep -oP  'modules/\Ktests/' )"
+	baseName=$( basename "$1" | cut -d. -f1 )
+	provePath="t/${modulePath}/${baseName}.t" 
+	proveArchive="${LOG_DIR}/t/${modulePath}/${baseName}.t" 
+	okArchive="${LOG_DIR}/t/${modulePath}/${baseName}.t" 
+  $verbose  && echo "modulePath  [ ${modulePath} ]"
+  $verbose  && echo "moduleType  [ ${moduleType} ]"
+  $verbose  && echo "baseName  [ ${baseName} ]"
+  $verbose  && echo "proveArchive  [ ${proveArchive} ]"
+  $verbose  && echo "provepath  [ ${provePath} ]"
+  # sed -ne '/^#   Failed test./{s///;h;};/^#   at[^0-9]/{s///;H;x;s/\n/ /;x;};/^#   expected/{;g;p;}'
+  # $verbose  &&  prove -v "$provePath" | grep -oP '^#\s+at'
+  # prove -a "${LOG_DIR}/" -v -m "$provePath" | \
+  #   perl -ne 's/^#\s+at(.+)\sline\s(\d{1,3})\.$/$1:$2:Error:/ and print'
+  # errorformat pattern 
+  # filename:Line:Col:Error: Message
+  # echo to standard error
+  # send to tmux-pane
+  formattedError=''
+  if [ -e "$provePath" ] ; then
+   formattedError=$(
+    prove -a "${LOG_DIR}/" -v "$provePath" | grep -oP  'at:\s\K(.+)'
+    )
+    # if we have a formatted error throw to sdtout then exit
+    if [ -z "${formattedError}" ] ; then
+      exit 0
+    else
+      $verbose  && echo "Throw ERRORS"
+      # echo 'throw errors"
+      # TODO might be an array
+      echo "${formattedError}" >&2 
+      false;
+      exit 1
+    fi
+  fi
+	exit
+	;;
+	file-exists)
+	params=( string )
+	query="(file:exists('$1'))"
+	returns='boolean'
+	;;
+	test)
+	params=( string )
+	echo xmldb:exist:///db/${APP_PATH}
+	query="test:suite(inspect:module-functions(xs:anyURI('xmldb:exist:///db/${APP_PATH}/modules/lib/tests/t-$1.xqm')))"
+	returns='xUnit'
+	;;
+	md-parse)
+	params=( string )
 	query="(md:parse('$1'))"
   returns='item'
   ;;
@@ -145,28 +316,35 @@ case "$QUERY" in
   ;;
   delete-collection)
   params=( route )
+  relPath=$1
+  path="${APP_PATH}/${relPath}"
   query="(if(\
-  xmldb:collection-available('${1}') ) then (\
-  xmldb:remove('${1}') ) else ())"
+  xmldb:collection-available('${path}') ) then (\
+  xmldb:remove('${path}') ) else ())"
   returns='string'
   ;;
   create-collection)
   params=( route )
+  relPath=$1
+  path="${APP_PATH}/${relPath}"
   query="(if(\
-  xmldb:collection-available('${1}') ) then (\
-  ) else (xmldb:create-collection('', '${1}'))
+  xmldb:collection-available('${path}') ) then (\
+  ) else (xmldb:create-collection('', '${path}'))
   )"
   returns='string'
   ;;
   collection-list)
   params=( route )
-  query="xmldb:get-child-collections('${1}')"
+  relPath=$1
+  path="${APP_PATH}/${relPath}"
+  query="xmldb:get-child-collections('${path}')"
   returns='list'
   ;;
-  collection-available)
+  collectionAvailable)
   params=( route )
-  query="xmldb:collection-available('${1}')"
-  returns='string'
+  path="${APP_PATH}/${relPath}"
+  query="xmldb:collection-available('${path}')"
+  returns='boolean'
   ;;
   xml-resource-available)
   params=( route )
@@ -215,14 +393,14 @@ case "$QUERY" in
   returns='repo_status'
   ;;
   repo-deploy-local)
-  params=( website download_url )   
-  HOST="${HOST_LOCAL}" 
+  params=( website download_url )
+  HOST="${HOST_LOCAL}"
   query="repo:install-and-deploy('${1}', '${2}')"
   returns='repo_status'
   ;;
   repo-deploy-remote)
   params=( website download_url )
-  HOST="${HOST_REMOTE}" 
+  HOST="${HOST_REMOTE}"
   query="repo:install-and-deploy('${1}', '${2}')"
   returns='repo_status'
   ;;
@@ -240,18 +418,76 @@ case "$QUERY" in
   returns='string'
   ;;
   store-built-resource)
-  params=(route directory pattern mime_type log)
+  params=( route directory pattern mime_type log )
   route=${1}
   directory=${2}
   pattern=${3}
   mime_type=${4}
   log=${5}
-  echo "route: [ $route ]"
-  echo "directory: [ $directory ]"
-  echo "pattern: [ $pattern ]"
-  echo "log: [ $log ]"
+  $verbose  && echo "route: [ $route ]"
+  $verbose  && echo "directory: [ $directory ]"
+  $verbose  && echo "pattern: [ $pattern ]"
+  $verbose  && echo "log: [ $log ]"
   query="xmldb:store-files-from-pattern('${route}','${directory}','${pattern}','$mime_type', true())"
   returns='stored_log'
+  ;;
+  permissions)
+  params=( route )
+  absPath=$(readlink -f $1)
+  relPath=$( echo "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+  path="${APP_PATH}/${relPath}"
+  $verbose  && echo "route: [ $route ]"
+  query="sm:get-permissions(xs:anyURI('${path}'))"
+  returns='permissions'
+  ;;
+  owner)
+  params=( route )
+  absPath=$(readlink -f $1)
+  relPath=$( echo "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+  path="${APP_PATH}/${relPath}"
+  $verbose  && echo "route: [ $route ]"
+  query="sm:get-permissions(xs:anyURI('${path}'))"
+  returns='owner'
+  ;;
+  group)
+  params=( route )
+  absPath=$(readlink -f $1)
+  relPath=$( echo "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+  path="${APP_PATH}/${relPath}"
+  $verbose  && echo "route: [ $route ]"
+  query="sm:get-permissions(xs:anyURI('${path}'))"
+  returns='group'
+  ;;
+  chmod)
+  params=( route mode )
+  route=${1}
+  mode=${2}
+  route="${APP_PATH}/${1}"
+  $verbose  && echo "route: [ $route ]"
+  $verbose  && echo "mode: [ $mode ]"
+  query="sm:chmod(xs:anyURI('${route}'),'${mode}')"
+  returns='empty'
+  ;;
+  chmodXQM):
+  params=( route )
+  absPath=$(readlink -f $1)
+  relPath=$( echo "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+  path="${APP_PATH}/${relPath}"
+  mode='rwxr-xr-x'
+  $verbose  && echo "path  [ ${path} ]"
+  $verbose  && echo "mode: [ $mode ]"
+  query="sm:chmod(xs:anyURI('${path}'),'${mode}')"
+  returns='empty'
+  ;;
+  chmodDataDir)
+  params=( route )
+  relPath=$1
+  path="xmldb:exist:///db/${APP_PATH}/${relPath}"
+  mode='crwxrwxr-x'
+  $verbose  && echo "path  [ ${path} ]"
+  $verbose  && echo "mode: [ $mode ]"
+  query="sm:chmod(xs:anyURI('${path}'),'${mode}')"
+  returns='empty'
   ;;
   store-all-build-content)
   params=(path)
@@ -368,6 +604,14 @@ case "$QUERY" in
   query="repo:list()"
   returns='list'
   ;;
+  site-pass)
+  params=()
+  APP_PATH="apps"
+  $verbose  && echo "INFO! - *user* : [ ${ABBREV} ]"
+  $verbose  && echo "INFO! - *pass*: [ $(<../.me-access-token) ]"
+  query="sm:passwd('${ABBREV}', '$(<../.me-access-token)')"
+  returns='empty'
+  ;;
   default-pass)
   params=(admin pass)
   KNOWN_USER="$1"
@@ -432,7 +676,7 @@ if [[ ${#params[@]} -ne ${#ARGS[@]} ]] ; then
   echo "FAILURE! ${QUERY} should have ${#params[@]} parameters"
   else
    echo "FAILURE! ${QUERY} should have ${#params[@]} parameters"
-   echo "INFO! - *PARAMS ARE* [ "${params[@]}" ]"
+   echo "INFO! - PARAMS ARE [ '${params[@]}' ]"
   fi
   exit 1
 fi
@@ -479,6 +723,13 @@ fi
 #  chmod +x "$(BIN_DIR)/response/${QUERY}.sh"
 #  $(BIN_DIR)/response/${QUERY}.sh
 #fi
+# @comment
+# nSTR="\
+# n = require('cheerio').load('$(echo $(<${TEMP_XML}))',\
+# {xmlMode: true})('exist\\\\:value');\
+# console.log( 'EXIST_VALUE=' + n.text());\
+# "
+# source <(node -e "${nSTR}")
 $verbose  && \
 echo "-------------------------------------------------------------------------"
 $verbose  && \
@@ -486,106 +737,233 @@ echo $(<${TEMP_XML})
 $verbose  && \
 echo "-------------------------------------------------------------------------"
 
+function getExistValueText( ){
+FILE="${CWD}/${TEMP_XML}"
+NS='declare namespace exist = "http://exist.sourceforge.net/NS/exist"'
+EXIST_VALUE=$(java -cp $SAXON \
+  net.sf.saxon.Query \
+  \!method=text \
+  -qversion:3.1  \
+  -qs:"${NS};doc('file://${FILE}')//exist:value/string()"\
+  )
+}
+
+function getPermission( ){
+FILE="${CWD}/${TEMP_XML}"
+NS='declare namespace sm = "http://exist-db.org/xquery/securitymanager"'
+EXIST_VALUE=$(java -cp $SAXON \
+  net.sf.saxon.Query \
+  \!method=text \
+  -qversion:3.1  \
+  -qs:"${NS};doc('file://${FILE}')//sm:permission/@${1}/string()"\
+  )
+}
+
 case "$returns" in
   boolean)
-  nSTR="\
-  n = require('cheerio').load('$(echo $(<${TEMP_XML}))',\
-  {xmlMode: true})('exist\\\\:value');\
-  console.log( 'EXIST_VALUE=' + n.text());\
-  "
-  source <(node -e "${nSTR}")
-  response="${QUERY}: ${EXIST_VALUE}"
-  $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
-  ;;
+    getExistValueText
+    response="${EXIST_VALUE}"
+    $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+    ;;
   empty)
-  echo "OK! - empty response expected"
-  echo "SUCCESS! - "
-  ;;
-	item)
-	response=$(
-  node -pe "\
-  n = require('cheerio').load('$(echo $(<${TEMP_XML}))');\
-	n('*').html()"
-	)
-	$verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
-	echo "$response" > ${STRING_RESPONSE}
-	;;
-	err)
-	#	http://www.gnu.org/prep/standards/standards.html#Errors
-	#	sourcefile:lineno.column: message
-	response=$(
-		echo $(<${TEMP_XML}) |
-		cheerio exist\\:value | sed -r 's/\&apos;/"/g' |
-		perl -ne \
- 's/.+err:[A-Z-0-9]{1,9}(.+)\[at line ([\d]{1,5}), column ([\d]{1,3}).?\]/:$2:$3: Warning: $1/ and print'
-		)
-	$verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
-	 echo "$response" > ${STRING_RESPONSE}
-	;;
-  string)
-  response=$(
-    echo $(<${TEMP_XML}) |
-    cheerio exist\\:value
+    $verbose  && echo "SUCCESS! - *RESPONSE*: [ 'OK' ]"
+    ;;
+  xUnit)
+    echo "$(<${TEMP_XML})" | tidy -q -xml -utf8 -indent --indent-attributes 1 --indent-spaces 1
+    # response=$(echo $(<${TEMP_XML} | tidy -q -indent -xml -utf8 ))
+    # $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+    # echo "$response" > ${STRING_RESPONSE}
+    ;;
+  item)
+    response=$(
+    node -pe "\
+      n = require('cheerio').load('$(echo $(<${TEMP_XML}))');\
+      n('*').html()"
     )
-  $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
-  echo "$response" > ${STRING_RESPONSE}
-  ;;
+    $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+    echo "$response" > ${STRING_RESPONSE}
+    ;;
+  element)
+    echo $(<${TEMP_XML})
+    ;;
+  documentNode)
+    echo $(<${TEMP_XML})
+    ;;
+  permissions)
+    getPermission mode
+    response="${EXIST_VALUE}"
+    $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+    $verbose  && echo "[ ${STRING_RESPONSE} ]"
+    echo "$response" > "${STRING_RESPONSE}"
+    response="${EXIST_VALUE}"
+    ;;
+  owner)
+    getPermission owner
+    response="${EXIST_VALUE}"
+    $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+    $verbose  && echo "[ ${STRING_RESPONSE} ]"
+    echo "$response" > "${STRING_RESPONSE}"
+    response="${EXIST_VALUE}"
+    ;;
+  group)
+    getPermission group
+    response="${EXIST_VALUE}"
+    $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+    $verbose  && echo "[ ${STRING_RESPONSE} ]"
+    echo "$response" > "${STRING_RESPONSE}"
+    response="${EXIST_VALUE}"
+    ;;
+  err)
+    #	http://www.gnu.org/prep/standards/standards.html#Errors
+    #	sourcefile:lineno.column: message
+    #	sourcefile:lineno.column:type: message
+    # just use perl to extract string
+    getExistValueText
+    response="${EXIST_VALUE}"
+    formattedError=""
+    $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+    if [ -z "${EXIST_VALUE}" ] ; then
+      #echo "SUCCESS! - *RESPONSE*: [ 'compiled without errors' ]"
+      exit 0
+    else
+      echo "compile error found"
+      echo "${response}"
+      if echo "${response}" | grep -qP 'err:[A-Z-0-9]{1,9}' ; then
+        if echo "${response}" | grep -qP 'err:[A-Z-0-9]{1,9}(.+)\[at line ([\d]{1,4}), column ([\d]{1,3})' ; then
+          formattedError=$(
+          echo "${response}" |  perl -ne \
+            's/.+err:([A-Z-0-9]{1,9})(.+)\[at line ([\d]{1,4}), column ([\d]{1,3}).?\]/$3:$4:Error:$2/ and print'
+          )
+        else
+          formattedError=$(
+          echo "${response}" |  perl -ne \
+            's/err:([A-Z-0-9]{1,9}):(.+)/1:1:Error:$2/ and print'
+          )
+        fi
+      fi
+
+      if echo "${response}" | grep -q 'error found while loading module' ; then
+        str="$(echo ${response} | \
+          grep -oP 'Module location hint URI\W+\K(\w+.\w+)')"
+        ln="$(grep -nP -m 1 "at\W+${str}" ${relPath}  | grep -Eo '^[^:]+')"
+        formattedError="${ln}:1:Error: ${response}"
+      fi
+
+      if echo "${response}" | grep -q 'found closing tag:' ; then
+        str="$(echo ${response} | \
+          grep -oP 'found closing tag: \K(\w+)')"
+        ln="$(grep -nP -m 1 "${str}" ${relPath}  | grep -Eo '^[^:]+')"
+        formattedError="${ln}:1:Error: ${response}"
+      fi
+
+      if echo "${response}" | grep -q 'is not set' ; then
+        # echo "GREPPED: $(echo ${response} | grep -oP '\$\K([\w-_]+)')"
+        str="$( echo ${response} | grep -oP '\$\K([\w-_]+)' )"
+        # echo "NUMBERED LINE: $(grep -nP -m 1 "\\\$${str}"  ${relPath} )"
+        ln="$(grep -nP -m 1 "\\\$${str}"  ${relPath} | grep -Eo '^[^:]+')"
+        formattedError="${ln}:1:Error: ${response}"
+        # echo "${formattedError}"
+      fi
+
+      if echo "${response}" | grep -q 'No namespace defined for prefix' ; then
+        str="$(echo ${response} | grep -oP 'No namespace defined for prefix \K\w+')"
+        ln="$(grep -nP -m 1 "${str}:\w+" ${relPath}  | grep -Eo '^[^:]+')"
+        formattedError="${ln}:1:Error: ${response}"
+      fi
+      if echo "${response}" | grep -q 'is not defined in module namespace:' ; then
+        str="$(echo ${response} | \
+          grep -oP '^\w+\s+\K(\w+\(.*?\))(?=\s+is not defined in module namespace)')"
+        ln="$(grep -nP -m 1 "${str}" ${relPath}  | grep -Eo '^[^:]+')"
+        formattedError="${ln}:1:Error: ${response}"
+      fi
+      if echo "${response}" | grep -q 'Syntax error within user defined function' ; then
+        str="$(echo ${response} | \
+          grep -oP 'Syntax error within user defined function \K(\w+:\w+)')"
+        ln="$(grep -nP -m 1 "${str}" ${relPath}  | grep -Eo '^[^:]+')"
+        formattedError="${ln}:1:Error: ${response}"
+      fi
+      # otherwise we have not found the error we are looking for
+      # so just create a error at the top of the file
+      [ -z "${formattedError}" ] && formattedError="1:1:Error: ${response}"
+    fi
+    # if we have a formatted error throw to sdtout then exit
+    if [ -z "${formattedError}" ] ; then
+      exit 0
+    else
+      # echo 'throw compile error'
+      echo "${relPath}:${formattedError}" >&2
+      false;
+      exit 1
+    fi
+    ;;
+  string)
+    getExistValueText
+    response="${EXIST_VALUE}"
+    $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+    $verbose  && echo "[ ${STRING_RESPONSE} ]"
+    echo "$response" > ${STRING_RESPONSE}
+    ;;
   stdout)
-  response=$(
-  node -pe "\
-  n = require('cheerio').load('$(echo $(<${TEMP_XML}))');\
-  n('stdout').text();"
-  )
-  $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
-  echo "$response" > ${STRING_RESPONSE}
-  ;;
+    response=$(
+    node -pe "\
+      n = require('cheerio').load('$(echo $(<${TEMP_XML}))');\
+      n('stdout').text();"
+    )
+    $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+    echo "$response" > ${STRING_RESPONSE}
+    ;;
   journal_log)
     echo "$( journalctl -n 1 -o cat -u exist | grep -oP '\)\K.+')"
-  ;;
-  stored_log)
-  response=$(
-    echo $(<${TEMP_XML}) |
-    cheerio exist\\:value
-    )
-  echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
-  stored_log=${LOG_DIR}/${log}.log
-  [ ! -e ${stored_log} ] && touch ${stored_log}
-  [ -n "${response}" ] && echo "${response}" >> ${stored_log}
-  ;;
-  uploaded_log)
-  response=$(
-    echo $(<${TEMP_XML}) |
-    cheerio exist\\:value
-    )
-  echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
-  case "$log" in
-    archive)
-    [ ! -e ${POSTS_UPLOADED_LOG} ] && touch ${POSTS_UPLOADED_LOG}
-    echo $response >> ${POSTS_UPLOADED_LOG}
     ;;
-    pages)
-    [ ! -e ${PAGES_UPLOADED_LOG} ] && touch ${PAGES_UPLOADED_LOG}
+  stored_log)
+    getExistValueText
+    response="${EXIST_VALUE}"
+    $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+    echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+
+    stored_log=${LOG_DIR}/${log}.log
+    # [ -e ${stored_log} ] && rm ${stored_log}
+    [ -n "${response}" ] && echo "${response}" > ${stored_log}
+    exit 0
+    ;;
+  uploaded_log)
+    response=$(
+    echo $(<${TEMP_XML}) |
+    cheerio exist\\:value
+    )
+    echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+    case "$log" in
+      archive)
+        [ ! -e ${POSTS_UPLOADED_LOG} ] && touch ${POSTS_UPLOADED_LOG}
+        echo $response >> ${POSTS_UPLOADED_LOG}
+        ;;
+      pages)
+        [ ! -e ${PAGES_UPLOADED_LOG} ] && touch ${PAGES_UPLOADED_LOG}
     [ -n "${response}" ] && echo "${path} ${response}" >> ${PAGES_UPLOADED_LOG}
     ;;
   esac
   ;;
-  list)
-  response=$(
-    echo $(<${TEMP_XML}) |
-    cheerio exist\\:value
-    )
- responseList=(${response})
-  listLength=${#responseList[@]}
-  for i in ${!responseList[@]}; do
-    printf "%d) %s\n"  $((i+1))  "${responseList[i]}"
-  done
-  echo "SUCCESS! - *RESPONSE*: [ ${listLength} ] items in ${QUERY} ]"
-  ;;
+list)
+	getExistValueText
+	response="${EXIST_VALUE}"
+	responseList=(${response})
+	listLength=${#responseList[@]}
+	for i in ${!responseList[@]}; do
+		if $verbose ; then
+			printf "%d) %s\n"  $((i+1))  "${responseList[i]}"
+		else
+			printf "%s\n" "${responseList[i]}"
+		fi
+	done
+	exit 0
+	# echo "SUCCESS! - *RESPONSE*: [ ${listLength} ] items in ${QUERY} ]"
+	;;
   element-status)
   response=$(
     echo $(<${TEMP_XML}) | grep -oP 'result="\K\w+'
     )
-  echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+	exit 0
+  # echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
   ;;
   repo_status)
   nSTR="\

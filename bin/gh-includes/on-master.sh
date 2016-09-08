@@ -358,6 +358,7 @@ IN_TERMINAL='false'
 echo "INFO! - *IN_TERMINAL* [ ${IN_TERMINAL} ]"
 }
 
+
 if [ -z "$(git status -s --porcelain)" ]  ; then
   echo "OK! - *REPO CLEAN* "
 else
@@ -486,9 +487,7 @@ echo "${newVer}"
 
 
 omUpdateSemver(){
-# TODO! 
-echo 'todo semver now in properties files'
-return 1    :
+echo 'todo semver now in "config" properties file'
 # depends on
 [ -z "${LATEST_TAG}" ] &&  parseTags  > /dev/null
 [ -z "${PR_MILESTONE_TITLE}" ] && parsePullRequest 

@@ -1,7 +1,4 @@
 
-G := $(GITHUB_DIR)
-L := $(LOG_DIR)
-
 ifeq ($(CURRENT_BRANCH),master)
  isMaster = yep
 else
@@ -269,24 +266,36 @@ $(G)/tags.json: $(G)/latest-release.json
 # $(JSN_DEPLOYMENT) $(JSN_DEPLOYMENT_STATUS) $(JSN_DEPLOYMENT_STATUSES)
 #{{{
 ###############################################################################
+# @xq -v repo-deploy-local \
+	#  NY
+#  "$(WEBSITE)" \
+#  "$(shell echo $$(<) |\
+#  jq '.assets[0] | .browser_download_url' )"
 
-DEPLOY_REMOTE_LOG =  $(LOG_DIR)/xq/deploy-remote.log
 
+.PHONY: deploy-local deploy-remote
 
-deploy: $(L)/xq/deploy-local.log
+ifneq ($(wildcard $(G)/latest-release.json),)
+releaseTagName != echo $$(<$(G)/latest-release.json) | jq '.tag_name'
+releaseName != echo $$(<$(G)/latest-release.json) | jq '.name'
+releaseDownloadUrl !=  echo $$(<$(G)/latest-release.json) | jq '.assets[0] | .browser_download_url'
+endif
 
-$(L)/xq/deploy-local.log: $(G)/latest-release.json
-	@echo '{{{##[ $@ ]##'
-	@echo $(basename $(notdir $@))
-	@echo "tag-name: $(shell echo $$(<$(<)) | jq '.tag_name')"
-	@echo "name: $(shell echo $$(<$(<)) | jq '.name')"
+deploy-local:
+	@echo "tag-name: $(releaseTagName) "
+	@echo "name: $(releaseName)"
 	@echo "WEBSITE: $(WEBSITE)"
-	@echo "browser_download_url: $(shell echo $$(<$(<)) | jq '.assets[0] | .browser_download_url' )"
-	@xq -v repo-deploy-local \
- "$(WEBSITE)" \
- "$(shell echo $$(<$(<)) |\
- jq '.assets[0] | .browser_download_url' )"
-	@echo "}}}"
+	@echo "browser_download_url: $(releaseDownloadUrl)"
+	@xq -v repo-deploy-local $(WEBSITE) $(releaseDownloadUrl)
+	@echo "------------------------------------------------------"
+
+deploy-remote:
+	@echo "tag-name: $(releaseTagName) "
+	@echo "name: $(releaseName)"
+	@echo "WEBSITE: $(WEBSITE)"
+	@echo "browser_download_url: $(releaseDownloadUrl)"
+	@xq -v repo-deploy-remote $(WEBSITE) $(releaseDownloadUrl)
+	@echo "------------------------------------------------------"
 
 # $(JSN_DEPLOYMENT_STATUS): $(JSN_DEPLOYMENT)
 # 	@gh create-deployment "$(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.tag_name')"

@@ -23,3 +23,27 @@ ifdef PARSED_ISSUE_NUMBER
 endif
 	@echo XAR $(XAR)
 	@echo TINY-LR_UP $(TINY-LR_UP)
+
+.PHONY: generate-certificate view-certificate
+
+generate-certificate:
+	@echo "$(NAME)"
+	@echo "$(ABBREV)"
+	@echo "$(EXIST_HOME)/tools/jetty/etc"
+	@ls "$(EXIST_HOME)/tools/jetty/etc"
+	@keytool -genkeypair \
+   -keystore $(EXIST_HOME)/tools/jetty/etc/keystore \
+  -dname "CN=$(NAME), OU=eXist-db Application Server, O=eXist-db, L=Awhitu, ST=Auckland, C=NZ" \
+  -keypass secret \
+  -storepass secret \
+  -keyalg RSA \
+  -keysize 2048 \
+  -alias $(ABBREV) \
+  -ext SAN=DNS:$(NAME) \
+  -validity 9999
+
+view-certificate:
+	keytool -list -v \
+ -alias $(ABBREV) \
+ -storepass secret \
+  -keystore $(EXIST_HOME)/tools/jetty/etc/keystore \

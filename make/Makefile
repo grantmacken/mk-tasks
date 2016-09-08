@@ -8,6 +8,11 @@ G := .github
 L := .logs
 B := build
 D := deploy
+P := pkg
+
+# keep intermediate files
+# http://stackoverflow.com/questions/3046117/gnu-makefile-multiple-outputs-from-single-rule-preventing-intermediate-files
+.SECONDARY:
 
 #{{{
 # Make sure we have the following apps installed:
@@ -29,14 +34,12 @@ ifeq ($(TRAVIS_BRANCH),)
 else
  CURRENT_BRANCH :=
 endif
-#
+
 ifneq ($(CURRENT_BRANCH),master)
  PARSED_ISSUE_LABEL := $(shell echo  "$(CURRENT_BRANCH)" |cut -d\- -f1)
  PARSED_ISSUE_NUMBER := $(shell echo  "$(CURRENT_BRANCH)" |cut -d\- -f2)
  PARSED_ISSUE_TITLE := $(shell echo $(CURRENT_BRANCH) |grep -oP '[a-z]{1,10}+-[0-9]{1,4}-\K(.+)' | tr '-' ' ')
 endif
-#
-SRC_BUILD := $(wildcard $(BUILD_DIR)/* )
 
 ifeq ($(TRAVIS_REPO_SLUG),)
  REPO_SLUG := $(shell git remote -v | grep -oP ':\K.+(?=\.git)' | head -1)
@@ -56,19 +59,18 @@ CURRENT_DATE_TIME != date "+%Y-%m-%dT%H:%M:%S"
 empty :=
 space := $(empty) $(empty)
 
-getMimeType = $(shell node -pe "\
- fs = require('fs');\
- re = /$1/;\
- n = require('cheerio').load(fs.readFileSync('$(EXIST_HOME)/mime-types.xml'),\
- { normalizeWhitespace: true, xmlMode: true});\
- n('extensions').filter(function(i, el){\
- return re.test(n(this).text());\
- }).parent().attr('name');\
-")
+
+getMimeType = $(shell java -cp $(SAXON) \
+	net.sf.saxon.Query \
+	\!method=text \
+	-qversion:3.1  \
+	-qs:"doc('file:///$(EXIST_HOME)/mime-types.xml')//mime-type[matches(./extensions,'\$(1),|\$(1)$$')]/@name/string()"\
+	)
+
 
 rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
-#}}}
-fo := $(TASKS_DIR)/repo.mk $(TASKS_DIR)/scripts.mk $(TASKS_DIR)/icons.mk
+#~/.config/nvim/words/ns-funcs.thesaurus}}}
+fo := $(TASKS_DIR)/repo.mk
 include $(filter-out $(fo) ,$(wildcard $(TASKS_DIR)/*.mk))
 include $(TASKS_DIR)/repo.mk
 # include $(TASKS_DIR)/modules.mk\
@@ -81,20 +83,4 @@ include $(TASKS_DIR)/repo.mk
 
 default: help
 
-assets: $(STYLES)
-
-site: $(BUILD_XQUERY_MODULES) $(BUILD_HTML_TEMPLATES)
-
-watch-site:
-	@watch -q $(MAKE) site
-
-watch-assets:
-	@watch -q $(MAKE) assets
-
-watch-issue:
-	@watch -q $(MAKE) issue
-
- test:
-	@prove
-
-.PHONY: watch-issue watch-assets watch-site help
+.PHONY: help
