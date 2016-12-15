@@ -1,0 +1,454 @@
+#!/bin/bash +x
+####################
+[ ! -e "config" ] &&  exit
+source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+CWD=$(pwd)
+BIN_DIR='../bin'
+TEMP_DIR='.temp'
+SAXON='/usr/local/eXist/lib/endorsed/Saxon-HE-9.6.0-7.jar'
+GIT_USER="$( git config --get user.name )"
+GIT_EMAIL="$( git config --get user.email )"
+GITHUB_ACCESS_TOKEN="$(<../.access-token)"
+MY_ACCESS_TOKEN="$(<../.me-access-token)"
+NS='http://exist.sourceforge.net/NS/exist'
+
+ENDPOINT="https://${NAME}/exist"
+AUTH="Authorization: Bearer ${MY_ACCESS_TOKEN}" 
+
+# Notes: Unlike 'xq' this bash  script makes a curl call over https to the websites  'endpoint' 
+# authorised access to the endpoint is obtained be  using a verified  jwt token 
+# authorised account   :  the rest query is executed with dba privilages. ( not the admin account however )   
+#                         the dba account is set up prior to using this script
+# relative paths:  the rest query is executed from athe apps context  /exist/rest/apps/${NAME}"
+
+#setup
+[ -d ${TEMP_DIR}/xq ] || mkdir -p ${TEMP_DIR}/xq
+
+IMPORTS="${BIN_DIR}/xq-includes"
+if [ -d ${IMPORTS} ];then
+    for f in "xq-usage"
+    do
+      if [ -e  ${IMPORTS}/${f}.sh ] ; then
+        #echo "Import $f as source"
+        chmod +x ${IMPORTS}/${f}.sh
+        source ${IMPORTS}/${f}.sh
+      fi
+    done
+    #echo "Export functions found in source so they can be used in subscripts"
+    funcNames=$( declare -F | cut -d" " -f3 )
+    for i in ${funcNames}
+    do
+        #echo ${i}
+        export -f ${i}
+    done
+ else
+    echo "ERR!:  link to imports not set up yet"
+    exit 1
+fi
+
+###################################
+
+verbose=false
+while getopts "h r v l" OPTION
+do
+  case $OPTION in
+    h)
+      if xqUsage ; then
+        exit 1
+      fi
+    ;;
+    l)
+      if xqListAvailableQueries ; then
+          exit 1
+      fi
+    ;;
+    v)
+      verbose=true
+      shift
+    ;;
+    *)
+  ;;
+  esac
+done
+
+# DECLARE GLOBALS
+###################################
+
+ARGUMENTS=$#
+QUERY=
+query=
+import=
+queryFile=
+returns=
+response=
+wrap='true'
+
+declare -a ARGS
+declare -a params
+
+if [ ! $ARGUMENTS -gt 0 ]; then
+  xqUsage
+  exit 1
+fi
+QUERY=$1
+$verbose  && echo "#${QUERY}#"
+# if we have a extended query or a interpolation heredoc
+# then create the query from the
+if [ $ARGUMENTS -eq 1 ]; then
+  if [ -e "bin/queries/${QUERY}.xq" ] ; then
+    queryFile="bin/queries/${QUERY}.xq"
+    query=$(<${queryFile})
+  fi
+  ARGS=()
+else
+  shift
+  ARGS=("$@")
+ $verbose  && echo "INFO! - *ARGS* [ ${ARGS[@]} ]"
+fi
+
+$verbose  && echo "INFO! - *QUERY* [ ${QUERY} ]"
+
+###############################################################################
+
+case "$QUERY" in
+  #LIST-START
+  list-modules)
+  params=( )
+  query="util:registered-modules()" 
+  returns=list
+  ;;  #  SECURITY MANAGER
+  groups-list)
+  params=( )
+  query="sm:list-groups( )"
+  returns='list'
+  ;;
+  users-list)
+  params=( )
+  query="sm:list-users( )"
+  returns='list'
+  ;; #  XMLDB
+  get-users)
+  params=( group )
+  query="xmldb:get-users( '$1' )"
+  returns='list'
+  ;;
+  uuid)
+  params=( )
+  query="util:uuid()"
+  returns='string'
+  ;;
+  collection-list)
+  params=( route )
+  relPath=$1
+  path="${relPath}"
+  query="()"
+  returns='list'
+  ;;
+  #LIST-END#
+  *)
+  echo "FAILURE! *no  query* named ${QUERY}"
+  xqUsage
+  xqListAvailableQueries
+  exit
+  ;;
+esac
+
+###############################################################################
+
+# if the query has not got correct params then exit
+if [[ ${#params[@]} -ne ${#ARGS[@]} ]] ; then
+  if [[ ${#params[@]} -eq 0 ]] ; then
+  echo "FAILURE! ${QUERY} should have ${#params[@]} parameters"
+  else
+   echo "FAILURE! ${QUERY} should have ${#params[@]} parameters"
+   echo "INFO! - PARAMS ARE [ '${params[@]}' ]"
+  fi
+  exit 1
+fi
+
+function postQuery( ){
+
+$verbose && echo 'POSTing to eXist'
+
+local max=9999
+
+local POST="$(
+cat << EOF
+<query xmlns="${NS}"
+start="1"
+max="${max}"
+wrap="${wrap}"
+>
+<text><![CDATA[
+xquery version "3.1";
+${import}
+${query}
+]]></text>
+</query>
+EOF
+)"
+
+TEMP_XML="${TEMP_DIR}/xq/${QUERY}.xml"
+if [ -e  ${TEMP_XML} ] ; then
+  rm ${TEMP_XML}
+fi
+
+local doRequest=$(
+curl -s \
+  -H "Content-Type: application/xml" \
+  -H "${AUTH}" \
+  -o ${TEMP_XML} \
+  -w "%{http_code}" \
+  -d "${POST}" \
+  ${ENDPOINT}) 
+
+# TODO! more http responses
+$verbose  && echo "DONE! status: [ ${doRequest} ]"
+case "${doRequest}" in
+  200)
+    $verbose  && \
+      echo "-------------------------------------------------------------------------"
+    $verbose  && \
+      echo $(<${TEMP_XML})  | tidy -q -xml -utf8 -indent --indent-attributes 1 --indent-spaces 1
+    $verbose  && \
+      echo "-------------------------------------------------------------------------"
+    return 0
+    ;;
+  202)
+      echo "-------------------------------------------------------------------------"
+      echo $(<${TEMP_XML})  | tidy -q -xml -utf8 -indent --indent-attributes 1 --indent-spaces 1
+    return 1
+    ;;
+  *)
+    echo "FAILURE! *query* reponse  ${doRequest}"
+    return  1
+    ;;
+esac
+}
+
+function getExistValueText( ){
+FILE="${CWD}/${TEMP_XML}"
+NS="declare namespace exist = '${NS}'"
+EXIST_VALUE=$(java -cp $SAXON \
+  net.sf.saxon.Query \
+  \!method=text \
+  -qversion:3.0  \
+  -qs:"${NS};doc('file://${FILE}')//exist:value/string()"\
+  )
+}
+
+function getPermission( ){
+FILE="${CWD}/${TEMP_XML}"
+NS='declare namespace sm = "http://exist-db.org/xquery/securitymanager"'
+EXIST_VALUE=$(java -cp $SAXON \
+  net.sf.saxon.Query \
+  \!method=text \
+  -qversion:3.0  \
+  -qs:"${NS};doc('file://${FILE}')//sm:permission/@${1}/string()"\
+  )
+}
+
+###############################################################################
+
+# post to eXist, store response a temp xml file
+# use saxon to extract bash strings or arrays that can be piped
+
+if postQuery ; then
+  case "$returns" in
+    boolean)
+      getExistValueText
+      response="${EXIST_VALUE}"
+      $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+      ;;
+    empty)
+      $verbose  && echo "SUCCESS! - *RESPONSE*: [ 'OK' ]"
+      ;;
+    xUnit)
+      echo "$(<${TEMP_XML})" | tidy -q -xml -utf8 -indent --indent-attributes 1 --indent-spaces 1
+      # response=$(echo $(<${TEMP_XML} | tidy -q -indent -xml -utf8 ))
+      # $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+      # echo "$response" > ${STRING_RESPONSE}
+      ;;
+    item)
+      response=$(
+      node -pe "\
+        n = require('cheerio').load('$(echo $(<${TEMP_XML}))');\
+        n('*').html()"
+      )
+      $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+      echo "$response" > ${STRING_RESPONSE}
+      ;;
+    element)
+      echo $(<${TEMP_XML})
+      ;;
+    documentNode)
+      echo "$(<${TEMP_XML})"
+      ;;
+    permissions)
+      getPermission mode
+      response="${EXIST_VALUE}"
+      $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+      ;;
+    owner)
+      getPermission owner
+      response="${EXIST_VALUE}"
+      $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+      ;;
+    group)
+      getPermission group
+      response="${EXIST_VALUE}"
+      $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+      ;;
+    err)
+      #	http://www.gnu.org/prep/standards/standards.html#Errors
+      #	sourcefile:lineno.column: message
+      #	sourcefile:lineno.column:type: message
+      # just use perl to extract string
+      getExistValueText
+      response="${EXIST_VALUE}"
+      formattedError=""
+      $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+      if [ -z "${EXIST_VALUE}" ] ; then
+        #echo "SUCCESS! - *RESPONSE*: [ 'compiled without errors' ]"
+        exit 0
+      else
+        echo "compile error found"
+        echo "${response}"
+        if echo "${response}" | grep -qP 'err:[A-Z-0-9]{1,9}' ; then
+          if echo "${response}" | grep -qP 'err:[A-Z-0-9]{1,9}(.+)\[at line ([\d]{1,4}), column ([\d]{1,3})' ; then
+            formattedError=$(
+            echo "${response}" |  perl -ne \
+              's/.+err:([A-Z-0-9]{1,9})(.+)\[at line ([\d]{1,4}), column ([\d]{1,3}).?\]/$3:$4:Error:$2/ and print'
+            )
+          else
+            formattedError=$(
+            echo "${response}" |  perl -ne \
+              's/err:([A-Z-0-9]{1,9}):(.+)/1:1:Error:$2/ and print'
+            )
+          fi
+        fi
+
+        if echo "${response}" | grep -q 'error found while loading module' ; then
+          str="$(echo ${response} | \
+            grep -oP 'Module location hint URI\W+\K(\w+.\w+)')"
+          ln="$(grep -nP -m 1 "at\W+${str}" ${relPath}  | grep -Eo '^[^:]+')"
+          formattedError="${ln}:1:Error: ${response}"
+        fi
+
+        if echo "${response}" | grep -q 'found closing tag:' ; then
+          str="$(echo ${response} | \
+            grep -oP 'found closing tag: \K(\w+)')"
+          ln="$(grep -nP -m 1 "${str}" ${relPath}  | grep -Eo '^[^:]+')"
+          formattedError="${ln}:1:Error: ${response}"
+        fi
+
+        if echo "${response}" | grep -q 'is not set' ; then
+          # echo "GREPPED: $(echo ${response} | grep -oP '\$\K([\w-_]+)')"
+          str="$( echo ${response} | grep -oP '\$\K([\w-_]+)' )"
+          # echo "NUMBERED LINE: $(grep -nP -m 1 "\\\$${str}"  ${relPath} )"
+          ln="$(grep -nP -m 1 "\\\$${str}"  ${relPath} | grep -Eo '^[^:]+')"
+          formattedError="${ln}:1:Error: ${response}"
+          # echo "${formattedError}"
+        fi
+
+        if echo "${response}" | grep -q 'No namespace defined for prefix' ; then
+          str="$(echo ${response} | grep -oP 'No namespace defined for prefix \K\w+')"
+          ln="$(grep -nP -m 1 "${str}:\w+" ${relPath}  | grep -Eo '^[^:]+')"
+          formattedError="${ln}:1:Error: ${response}"
+        fi
+        if echo "${response}" | grep -q 'is not defined in module namespace:' ; then
+          str="$(echo ${response} | \
+            grep -oP '^\w+\s+\K(\w+\(.*?\))(?=\s+is not defined in module namespace)')"
+          ln="$(grep -nP -m 1 "${str}" ${relPath}  | grep -Eo '^[^:]+')"
+          formattedError="${ln}:1:Error: ${response}"
+        fi
+        if echo "${response}" | grep -q 'Syntax error within user defined function' ; then
+          str="$(echo ${response} | \
+            grep -oP 'Syntax error within user defined function \K(\w+:\w+)')"
+          ln="$(grep -nP -m 1 "${str}" ${relPath}  | grep -Eo '^[^:]+')"
+          formattedError="${ln}:1:Error: ${response}"
+        fi
+        # otherwise we have not found the error we are looking for
+        # so just create a error at the top of the file
+        [ -z "${formattedError}" ] && formattedError="1:1:Error: ${response}"
+      fi
+      # if we have a formatted error throw to sdtout then exit
+      if [ -z "${formattedError}" ] ; then
+        exit 0
+      else
+        # echo 'throw compile error'
+        echo "${relPath}:${formattedError}" >&2
+        false;
+        exit 1
+      fi
+      ;;
+    string)
+      getExistValueText
+      response="${EXIST_VALUE}"
+      $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+      ;;
+    stdout)
+      response=$(
+      node -pe "\
+        n = require('cheerio').load('$(echo $(<${TEMP_XML}))');\
+        n('stdout').text();"
+      )
+      $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+      echo "$response" > ${STRING_RESPONSE}
+      ;;
+    journal_log)
+      echo "$( journalctl -n 1 -o cat -u exist | grep -oP '\)\K.+')"
+      ;;
+    stored_log)
+      getExistValueText
+      response="${EXIST_VALUE}"
+      $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+      echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+
+      stored_log=${LOG_DIR}/${log}.log
+      # [ -e ${stored_log} ] && rm ${stored_log}
+      [ -n "${response}" ] && echo "${response}" > ${stored_log}
+      exit 0
+      ;;
+    list)
+      getExistValueText
+      response="${EXIST_VALUE}"
+      responseList=(${response})
+      #listLength=${#responseList[@]}
+      for i in "${!responseList[@]}"; do
+        if $verbose ; then
+          printf "%d) %s\n"  $((i+1))  "${responseList[i]}"
+        else
+          printf "%s\n" "${responseList[i]}"
+        fi
+      done
+      exit 0
+      ;;
+    element-status)
+      response=$(
+      echo $(<${TEMP_XML}) | grep -oP 'result="\K\w+'
+      )
+      exit 0
+      # echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+      ;;
+    repo_status)
+      nSTR="\
+        n = require('cheerio').load('$(echo $(<${TEMP_XML}))',\
+        {xmlMode: true})('status');\
+          console.log( 'EXIST_REPO_RESULT=' + n.attr('result') );\
+          console.log( 'EXIST_REPO_TARGET=' + n.attr('target') );\
+          "
+      source <(node -e "${nSTR}")
+      response="${EXIST_REPO_RESULT}: ${EXIST_REPO_TARGET}"
+      $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+      echo "${response}" >  ${LOG_FILE}
+      ;;
+    *)
+      echo "FAILURE! - no return value set"
+      exit 1
+  esac
+  echo ${response}
+  exit 0
+fi
+exit 1
+
