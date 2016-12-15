@@ -72,12 +72,18 @@ fi
 }
 
 function parseTags(){
-jsnTAGS=$(<${JSN_TAGS})
+$verbose && echo 'parse tags'
+jsnTAGS="$(<${JSN_TAGS})"
 LATEST_TAG="$(
+
 echo "${jsnTAGS}" |
 jq -r -c '.[0] | .name '
 )"
-echo "INFO! - *LATEST_TAG*: [ ${LATEST_TAG} ]"
+if ($verbose) then
+  echo "INFO! - *LATEST_TAG*: [ ${LATEST_TAG} ]"
+else
+  echo "${LATEST_TAG}"
+fi
 }
 
 function parseFetchedIssues(){

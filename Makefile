@@ -29,5 +29,4 @@ install:
 	@echo $(UP_TARG_DIR)
 	@cd $(UP_TARG_DIR) && npm install
 
-
 .PHONY: build clean install info

@@ -26,7 +26,9 @@ else
   TINY-LR_UP :=
 endif
 
+# VERSION = $(shell echo $$(gh latest-tag | sed 's/v//'))
 VERSION != echo "$(SEMVER)" | sed 's/v//'
+
 XAR != echo "$(DEPLOY_DIR)/$(ABBREV)-$(VERSION).xar"
 
 ifeq ($(TRAVIS_BRANCH),)
@@ -51,7 +53,7 @@ OWNER := $(shell echo  "$(REPO_SLUG)" |cut -d/ -f1)
 REPO := $(shell echo  "$(REPO_SLUG)" |cut -d/ -f2)
 API_REPO := $(REPO_BASE_URL)/repos/$(REPO_SLUG)
 #derived vars
-WEBSITE := http://$(REPO)
+WEBSITE := https://$(REPO)
 CURRENT_DATE  != date "+%Y-%m-%d"
 CURRENT_DATE_TIME != date "+%Y-%m-%dT%H:%M:%S"
 
@@ -59,14 +61,14 @@ CURRENT_DATE_TIME != date "+%Y-%m-%dT%H:%M:%S"
 empty :=
 space := $(empty) $(empty)
 
-
 getMimeType = $(shell java -cp $(SAXON) \
-	net.sf.saxon.Query \
-	\!method=text \
-	-qversion:3.1  \
-	-qs:"doc('file:///$(EXIST_HOME)/mime-types.xml')//mime-type[matches(./extensions,'\$(1),|\$(1)$$')]/@name/string()"\
-	)
+ net.sf.saxon.Query \
+ \!method=text \
+ -qversion:3.1  \
+ -qs:"doc('file:///$(EXIST_HOME)/mime-types.xml')//mime-type[matches(./extensions,'\$(1),|\$(1)$$')]/@name/string()"\
+)
 
+cat = $(shell if [ -e $(1) ] ;then echo "$$(<$(1))";fi )
 
 rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
 #~/.config/nvim/words/ns-funcs.thesaurus}}}

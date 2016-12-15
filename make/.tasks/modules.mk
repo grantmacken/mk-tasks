@@ -21,12 +21,15 @@
 # #==========================================================
 SRC_XQ := $(shell find modules -name '*.xq' )
 SRC_XQM := $(shell find modules -name '*.xqm' )
+SRC_XQL := $(shell find modules -name '*.xql' )
+
 SRC_API := $(shell find modules/api -name '*.xqm' )
 SRC_LIB := $(shell find modules/lib -name '*.xqm' )
 SRC_RENDER := $(shell find modules/render -name '*.xqm' )
-SRC_XQL := $(shell find modules -name '*.xql' )
+
 
 XQ_MODULES  := $(patsubst modules/%.xq,$(L)/modules/%.json,$(SRC_XQ))
+
 API_MODULES := $(patsubst modules/%.xqm,$(L)/modules/%.json,$(SRC_API))
 LIB_MODULES := $(patsubst modules/%.xqm,$(L)/modules/%.json,$(SRC_LIB))
 RENDER_MODULES := $(patsubst modules/%.xqm,$(L)/modules/%.json,$(SRC_RENDER))
@@ -45,10 +48,11 @@ RENDER_MODULES := $(patsubst modules/%.xqm,$(L)/modules/%.json,$(SRC_RENDER))
 #############################################################
 
 render-modules: $(RENDER_MODULES)
-lib-modules:   $(LIB_MODULES)
-api-modules:   $(API_MODULES)
+lib-modules:    $(LIB_MODULES)
+api-modules:    $(API_MODULES)
 
-modules: $(LIB_MODULES) $(XQ_MODULES)
+modules: $(LIB_MODULES) $(API_MODULES) $(RENDER_MODULES)
+ 
 #for testing  use: make watch-modules
 watch-modules:
 	@watch -q $(MAKE) modules
@@ -60,7 +64,7 @@ watch-modules:
 # Copy over xqm query modules into build
 
 $(B)/modules/%.xqm: modules/%.xqm
-	@echo "## $@ ##" >/dev/null
+	@echo "## $@ ##"
 	@mkdir -p $(@D)
 	@echo "SRC: $<" >/dev/null
 	@echo "before we copy into the build dir" >/dev/null
@@ -74,7 +78,7 @@ $(B)/modules/%.xqm: modules/%.xqm
 # Copy over xq xquery modules into build
 
 $(B)/modules/%.xq: modules/%.xq
-	@echo "## $@ ##" >/dev/null
+	@echo "## $@ ##"
 	@mkdir -p $(@D)
 	@echo "SRC: $<" >/dev/null
 	@echo "before we copy into the build dir" >/dev/null
@@ -87,7 +91,7 @@ $(B)/modules/%.xq: modules/%.xq
 # Store in eXist and log response
 
 $(L)/modules/%.log: $(B)/modules/%.xqm
-	@echo "## $@ ##" >/dev/null
+	@echo "## $@ ##"
 	@echo "SRC: $<" >/dev/null
 	@echo "eXist collection_uri: $(join apps/,$(NAME))" >/dev/null
 	@echo "directory in file system: $(abspath  $(subst /$(subst build/,,$(<)),,$(<)))" >/dev/null
@@ -111,7 +115,7 @@ $(L)/modules/%.log: $(B)/modules/%.xqm
 # Store in eXist and log response
 
 $(L)/modules/%.log: $(B)/modules/%.xq
-	@echo "## $@ ##" >/dev/null
+	@echo "## $@ ##"
 	@echo "SRC: $<" >/dev/null
 	@echo "eXist collection_uri: $(join apps/,$(NAME))" >/dev/null
 	@echo "directory in file system: $(abspath  $(subst /$(subst build/,,$(<)),,$(<)))"   >/dev/null
@@ -145,23 +149,22 @@ $(L)/modules/%.log: $(B)/modules/%.xq
 
 testPath = $(subst /tests/,/,$(addprefix t/modules/, $(addsuffix .t,$1)))
 hasTest = $(wildcard $(call testPath,$1))
-isRestxqReg = $(shell echo '$(dir $1)' | grep -oP '^(api|render)' )
+isRestxqReg = $(shell echo '$1')
 relDbPath = $(shell tail -n 1 $1 | grep -oP '$(NAME)/\K(.+)')
 
 $(L)/modules/%.json: $(L)/modules/%.log
-	@echo "## $@ ##" >/dev/null
+	@echo "## $@ ##"
 	@echo "SRC: $<" >/dev/null
-	@echo "STEM:  $*" >/dev/null
+	@echo "STEM:  $*"
+	@echo "not dir: $(notdir $*)"
+	@echo "dir: $(dir $*)"
 	@echo "input log: $<" >/dev/null
 	@echo "input log last item: $(shell tail -n 1 $<)" >/dev/null
 	@echo "output log: $@" >/dev/null
 	@echo "suffix: $(suffix $(shell tail -n 1 $<)) " >/dev/null
 	@echo "stored-module-path: $(call relDbPath,$<)"
-	@echo "check if restxq module and reregister: $(call isRestxqApi,$*)"
-	@$(if $(call isRestxqReg,$*),\
- echo '$(call relDbPath,$<)' && \
- xq register $(call relDbPath,$<) >/dev/null,\
- )
+	@echo "reregister restxq modules TODO!"
+	@xq register 'modules/api/router.xqm' >/dev/null
 	@echo "check if possible test plan: $(call testPath,$*)"
 	@$(if $(call hasTest,$*),\
  xq prove $(call relDbPath,$<),)

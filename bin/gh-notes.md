@@ -40,7 +40,9 @@ Don't push until ready for a pull request
     - `git commit -am ''` combined changes into commit
     - `git rebase -i @{u
 
- notes: if I am the only person working on the branch there is no need to
+m content/pages/about/micropub-api.md
+nvim
+notes: if I am the only person working on the branch there is no need to
  `git pull --rebase` otherwise ...
 
 4. pull request: when issue resolved create a pull request. The pull request

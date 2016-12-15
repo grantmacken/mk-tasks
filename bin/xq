@@ -185,7 +185,7 @@ curl -s \
   $verbose  && echo "import  [ ${import} ]"
 	query="(exrest:register-module(xs:anyURI('$path')))"
 	returns='documentNode'
-	;;
+  ;;
   deregister)
 	params=( route )
 	absPath=$(readlink -f $1)

@@ -137,9 +137,9 @@ curl -s \
 [ -n "${VERBOSE}" ] && \
 echo "DONE! status: [ ${doRequest} ]"
 # echo $(<${TEMP_XML})
-if [[ ${doRequest} = 200  || ${doRequest} = 304 || ${doRequest} = 201  ]]
+if [[ ${dorequest} = 200  || ${dorequest} = 304 || ${dorequest} = 201  ]]
 then
-  if [ -e ${TEMP_XML} ] ;then
+  if [ -e ${temp_xml} ] ;then
     return 0
   else
     return 1

@@ -331,6 +331,11 @@ case "$REQUEST" in
   echo "${jsnMILESTONES}" | R  "filter where-eq number: $1" 'project [\number \title \description]'  -o table
   exit
   ;;
+  latest-milestone)
+  parsePullRequest
+  echo "${PR_MILESTONE_TITLE}"
+  exit;
+  ;;
 # ISSUES
   parse-branch-name)
   params=( )
@@ -749,7 +754,7 @@ EOF
 # TAGS
 # https://developer.github.com/v3/repos/#list-tags
 # https://developer.github.com/v3/git/refs/
-# ? tag is create when we create a release
+# tag is create when we merge a pull release
 #o should be able to delete tag by deleleting release
   get-tags)
   params=( )

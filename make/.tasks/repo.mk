@@ -1,3 +1,28 @@
+# github repo TASKS
+###############################################################################
+#  make issue 
+# ISSUE WITH TASK LIST
+#  on master:
+#  -  make issue:  create a new issue on github
+#  -  make branch  create a branch with branch name based on issue 
+#  on branch
+#   * document changes with issue list
+#   * don't push until ready for a pull-request
+#   * before push rebase: `git rebase -i @{u}`
+#
+# PULL REQUEST PHASE
+#  - pull-request
+#  - gh create-pr-shipit-comment
+#  - pr-shipit ... creates a Looks Good To Me shiptit comment
+#  - pr-status ... creates a All Good status  
+#  - pr-merge
+#
+#   postMergePackage
+#   
+#RELEASE
+# - release
+
+###############################################################################
 
 ifeq ($(CURRENT_BRANCH),master)
  isMaster = yep
@@ -60,7 +85,7 @@ ISSUE.md: $(JSN_REPO)
 
 $(G)/issue.json: ISSUE.md
 	@echo "{{{##[ $@ ]##"
-	$(if $(isMaster),gh create-issue,)
+	$(if $(isMaster),gh create-issue,gh sync-issue)
 	$(call chkJson,$@)
 	@echo "}}}"
 # @echo  "CURRENT_BRANCH:  $(CURRENT_BRANCH)"
@@ -93,15 +118,27 @@ $(G)/branch.json: $(G)/issue.json $(G)/issues.json
 
 ###############################################################################
 # PULL REQUEST PHASE
-#
+#  - pull-request
+#  - gh create-pr-shipit-comment
+#  - pr-status
+#  - pr-merge
 ###############################################################################
 #{{{
+
+pr:
+	@$(MAKE) pull-request
+	@$(MAKE) pr-shipit
+	@$(MAKE) pr-status
+	@$(MAKE) pr-merge
+	@$(MAKE) pr-merge
+
 
 pull-request: $(G)/pr-comments.json
 
 # pr-comment: $(G)/pr-comment.json
 # NOTE: do comment stuff manually for now
-# 
+
+pr-shipit: $(G)/pr-comment.json
 
 pr-status:  $(G)/pr-combined-status.json  
 
@@ -122,7 +159,7 @@ $(G)/pr-comments.json:  $(G)/pull-request.json
 $(G)/pr-comment.json: $(G)/pr-comments.json
 	@echo "{{{##[ $@ ]##"
 	@eval $(echo "$$(< $<)" | jq -r '. | length == 0') &&\
- gh create-pr-compare-url-comment &&  gh get-pr-comments
+ gh create-pr-shipit-comment &&  gh get-pr-comments
 
 # $(if $(shell echo "$$(<$(JSN_PR_COMMENTS))" | jq '. | length == 0' | @sh ),true)
 # @echo "no comments yet, so create a compare url comment"
@@ -173,18 +210,40 @@ $(G)/pr-combined-status.json: $(G)/pr-status.json
 
 $(G)/merge.json: $(G)/pr-combined-status.json
 	@echo "##[ $@ ]##"
+	@echo '$(call cat,$<)' | jq '.'
 	@echo "if conditions not meet fail. below will eval to true or false "
-	@$$( echo "$$(<$<)" | jq '.state == "success"')
-	@$$( echo "$$(<$<)" | jq '.total_count == 1'  )
-	@$$( echo "$$(<$<)" | jq '.statuses | .[] | contains({"state":"success"})')
-	@$$( echo "$$(<$<)" | jq 'contains({statuses: [{"description": "All good"}]})')
-	@$$( echo "$$(<$<)" | jq '(.state == "success") and (contains({statuses: [{"description": "All good"}]}))')
+	@echo 'successful state ' \
+ $$( echo '$(call cat,$<)' | jq '.state == "success"')
+	@echo 'statuses array with success state' \
+ $$( echo '$(call cat,$<)' | jq '.statuses | .[] | contains({"state":"success"})')
+	@echo 'statuses with all good description ' \
+ $$( echo '$(call cat,$<)' | jq 'contains({statuses: [{"description": "All good"}]})')
+	@echo 'both successful state and all good' \
+ $$( echo '$(call cat,$<)' | jq '(.state == "success") and (contains({statuses: [{"description": "All good"}]}))')
+	@eval $$( echo '$(call cat,$<)' | jq '.state == "success"')
+	@eval $$( echo '$(call cat,$<)' | jq '.statuses | .[] | contains({"state":"success"})')
+	@eval $$( echo '$(call cat,$<)' | jq 'contains({statuses: [{"description": "All good"}]})')
+	@eval $$( echo '$(call cat,$<)' | jq '(.state == "success") and (contains({statuses: [{"description": "All good"}]}))')
 	@echo "pull request combined status all ready to merge"
 	@gh merge-pull-request
-	@echo "------------------------------------------------------------------ "
+	@$(MAKE) pr-merged
 
 
+postMergeInfo:
+	@echo 'post merge info'
+	@echo '---------------'
+	@gh list-tags
+	@echo 'latest tag'
+	@gh -v latest-tag
 
+pr-merged: config
+	@echo 'post merge build'
+	@echo '---------------'
+	@echo 'latest tag:       ' $$(gh latest-tag)
+	@echo 'latest milestone: ' $$(gh latest-milestone)
+	@gh update-semver  $$(gh latest-tag)  $$(gh latest-milestone)
+	@sed -i -r "s/^SEMVER=.*/SEMVER=$$(gh update-semver $$(gh latest-tag) $$(gh latest-milestone))/" config
+	@$(MAKE) package
 
 # }}}
 ###############################################################################
@@ -204,7 +263,11 @@ $(G)/merge.json: $(G)/pr-combined-status.json
 #{{{
 ###############################################################################
 
-release: $(G)/tags.json
+#release: $(G)/tags.json
+
+release: $(G)/release.json
+
+upload: $(G)/tags.json
 
 $(G)/release.json: $(XAR)
 	@$(info {{{##[ $@ ]##)
@@ -241,8 +304,14 @@ $(G)/latest-release.json: $(G)/asset_uploaded.json
 $(G)/tags.json: $(G)/latest-release.json
 	@echo "##[ $@ ]##"
 	@gh get-tags
+	@echo 'stash the updated config file'
+	@git stash
+	@echo 'Pull in tags'
 	@git pull --tags
+	@echo 'pop back the config file which contains the semver'
+	@git stash pop
 	@git tag
+	@cat config
 	@echo "------------------------------------------------------------------ "
 #}}}
 ###############################################################################
@@ -298,6 +367,8 @@ deploy-remote:
 	@echo "------------------------------------------------------"
 
 # $(JSN_DEPLOYMENT_STATUS): $(JSN_DEPLOYMENT)
+#
+# @xq -v repo-deploy-local $(WEBSITE) $(releaseDownloadUrl)
 # 	@gh create-deployment "$(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.tag_name')"
 # 	@echo "##[ $@ ]##"
 # 	@echo  "after localhost tests create default success status"

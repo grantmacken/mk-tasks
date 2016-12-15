@@ -64,6 +64,7 @@ $(B)/repo.xml: $(P)/repo.xml $(CONFIG_FILE)
  n('permissions').attr('user','$(ABBREV)');\
  n('permissions').attr('group','$(ABBREV)');\
  require('fs').writeFileSync('./$@', n.xml() )"
+	@cat $@
 	@echo "------------------------------------------------------------------ "
 
 $(B)/expath-pkg.xml: $(P)/expath-pkg.xml $(CONFIG_FILE)
@@ -74,14 +75,14 @@ $(B)/expath-pkg.xml: $(P)/expath-pkg.xml $(CONFIG_FILE)
  var cheerio = require('cheerio');var fs = require('fs');\
  var x = fs.readFileSync('./$<').toString();\
  var n = cheerio.load(x,{normalizeWhitespace: false,xmlMode: true});\
- n('package').attr('name', '$(WEBSITE)');\
+ n('package').attr('name', '$(NAME)');\
  n('package').attr('abbrev', '$(ABBREV)');\
  n('package').attr('version', '$(VERSION)');\
  n('package').attr('spec', '1.0');\
  n('title').text('$(NAME)');\
  require('fs').writeFileSync('./$@', n.xml() )"
+	@cat $@
 	@echo "------------------------------------------------------------------ "
-
 
 # Copy over package root files
 $(B)/%: $(P)/%

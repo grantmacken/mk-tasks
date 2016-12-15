@@ -464,10 +464,11 @@ doTask=$( git push origin --tags )
 echo "DONE! ${doTask}"
 }
 
-omSemVer(){
-local semverMajor=$( cut -d'.' -f1 <<<  ${1} )
-local semverMinor=$( cut -d'.' -f2 <<<  ${1} )
-local semverPatch=$( cut -d'.' -f3 <<<  ${1} )
+function omSemVer(){
+local v=$( echo "${1}" | sed 's/v//' )
+local semverMajor=$( cut -d'.' -f1 <<<  ${v} )
+local semverMinor=$( cut -d'.' -f2 <<<  ${v} )
+local semverPatch=$( cut -d'.' -f3 <<<  ${v} )
 local currentVer="v${semverMajor}.${semverMinor}.${semverPatch}"
 case "${2}" in
   strategy-patch)
