@@ -19,6 +19,10 @@
 #
 #
 # #==========================================================
+
+SOURCE_MODULES := $(shell find modules -name '*.xqm' )
+BUILD_MODULES  := $(patsubst modules/%,$(B)/modules/%,$(SOURCE_MODULES))
+
 SRC_XQ := $(shell find modules -name '*.xq' )
 SRC_XQM := $(shell find modules -name '*.xqm' )
 SRC_XQL := $(shell find modules -name '*.xql' )
@@ -28,8 +32,9 @@ SRC_LIB := $(shell find modules/lib -name '*.xqm' )
 SRC_RENDER := $(shell find modules/render -name '*.xqm' )
 
 
-XQ_MODULES  := $(patsubst modules/%.xq,$(L)/modules/%.json,$(SRC_XQ))
 
+
+XQ_MODULES  := $(patsubst modules/%.xq,$(L)/modules/%.json,$(SRC_XQ))
 API_MODULES := $(patsubst modules/%.xqm,$(L)/modules/%.json,$(SRC_API))
 LIB_MODULES := $(patsubst modules/%.xqm,$(L)/modules/%.json,$(SRC_LIB))
 RENDER_MODULES := $(patsubst modules/%.xqm,$(L)/modules/%.json,$(SRC_RENDER))
@@ -51,7 +56,9 @@ render-modules: $(RENDER_MODULES)
 lib-modules:    $(LIB_MODULES)
 api-modules:    $(API_MODULES)
 
-modules: $(LIB_MODULES) $(API_MODULES) $(RENDER_MODULES)
+modules: $(BUILD_MODULES)
+
+#$(LIB_MODULES) $(API_MODULES) $(RENDER_MODULES)
  
 #for testing  use: make watch-modules
 watch-modules:
@@ -60,33 +67,38 @@ watch-modules:
 .PHONY:  watch-modules 
 
 #############################################################
-
+# @$(if $(findstring api/,$*),\
+# xQ register '$<'  && \
+# echo 'registered api module', )
 # Copy over xqm query modules into build
 
-$(B)/modules/%.xqm: modules/%.xqm
+$(B)/modules/%: modules/%
 	@echo "## $@ ##"
-	@mkdir -p $(@D)
-	@echo "SRC: $<" >/dev/null
-	@echo "before we copy into the build dir" >/dev/null
-	@echo "check if eXist can compile the module" >/dev/null
-	@echo 'copied files into build directory' >/dev/null
-	xq compile $<
-	@cp $< $@
+	@[ -d @D ] || mkdir -p $(@D)
+	@echo "SRC: [ $< ]"
+	@echo "STEM: [ $* ]"
+	@xQ compile $< && echo "checked if eXist can compile the module"
+	@xQ store $< && echo "stored module into eXist" 
+	@$(if $(shell xQ permissions $< | grep 'rwxrwxr-x'),,\
+ xQ chmod '$<' 'rwxrwxr-x' && \
+ echo 'set execute perimissions for xquery modules')
+	@xQ register 'modules/api/router.xqm' && echo 'registered api module'
+	@cp $< $@ && echo 'copied files into build directory'
 	@echo '-----------------------------------------------------------------'
 
 # Copy over xq xquery modules into build
 # Copy over xq xquery modules into build
 
-$(B)/modules/%.xq: modules/%.xq
-	@echo "## $@ ##"
-	@mkdir -p $(@D)
-	@echo "SRC: $<" >/dev/null
-	@echo "before we copy into the build dir" >/dev/null
-	@echo "check if eXist can compile the module" >/dev/null
-	@echo 'copied files into build directory' >/dev/null
-	xq compile $<
-	@cp $< $@
-	@echo '-----------------------------------------------------------------'
+# $(B)/modules/%.xq: modules/%.xq
+# @echo "## $@ ##"
+# @mkdir -p $(@D)
+# @echo "SRC: $<" >/dev/null
+# @echo "before we copy into the build dir" >/dev/null
+# @echo "check if eXist can compile the module" >/dev/null
+# @echo 'copied files into build directory' >/dev/null
+# xq compile $<
+# @cp $< $@
+# @echo '-----------------------------------------------------------------'
 
 # Store in eXist and log response
 
@@ -101,15 +113,15 @@ $(L)/modules/%.log: $(B)/modules/%.xqm
 	@echo "stored log dir : $(L)/$(dir $(subst build/,,$(<)))" >/dev/null
 	@echo "dir : $(shell cut -d '/' -f1 <<< '$*') " >/dev/null
 	@mkdir -p $(L)/$(dir $(subst build/,,$(<)))
-	@xq store-built-resource \
+	@xQ store-built-resource \
  '$(join apps/,$(NAME))' \
  '$(abspath  $(subst /$(subst build/,,$(<)),,$(<)))' \
  '$(subst build/,,$(<))' \
  '$(call getMimeType,$(suffix $(notdir $(<))))' \
  '$(basename $(subst build/,,$(<)))'
 	@echo "make sure we have correct execute permisions for modules"
-	@$(if $(shell xq permissions $(subst build/,,$(<)) | grep 'rwxrwxr-x'),,\
- xq chmod '$(subst build/,,$(<))' 'rwxrwxr-x')
+	@$(if $(shell xQ permissions $(subst build/,,$(<)) | grep 'rwxrwxr-x'),,\
+ xQ chmod '$(subst build/,,$(<))' 'rwxrwxr-x')
 	@echo '-----------------------------------------------------------------'
 
 # Store in eXist and log response
@@ -124,7 +136,7 @@ $(L)/modules/%.log: $(B)/modules/%.xq
 	@echo "stored log path : $(basename $(subst build/,,$(<)))" >/dev/null
 	@echo "stored log dir : $(L)/$(dir $(subst build/,,$(<)))" >/dev/null
 	@mkdir -p $(L)/$(dir $(subst build/,,$(<)))
-	@xq store-built-resource \
+	@xQ store-built-resource \
  '$(join apps/,$(NAME))' \
  '$(abspath  $(subst /$(subst build/,,$(<)),,$(<)))' \
  '$(subst build/,,$(<))' \
