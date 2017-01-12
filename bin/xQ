@@ -5,11 +5,13 @@ source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
 CWD=$(pwd)
 BIN_DIR='../bin'
 TEMP_DIR='.temp'
-SAXON='/usr/local/eXist/lib/endorsed/Saxon-HE-9.6.0-7.jar'
+LOG_DIR='.logs'
 GIT_USER="$( git config --get user.name )"
 GIT_EMAIL="$( git config --get user.email )"
 GITHUB_ACCESS_TOKEN="$(<../.access-token)"
 MY_ACCESS_TOKEN="$(<../.me-access-token)"
+EXIST_HOME='/usr/local/eXist'
+SAXON='/usr/local/eXist/lib/endorsed/Saxon-HE-9.6.0-7.jar'
 NS='http://exist.sourceforge.net/NS/exist'
 
 ENDPOINT="https://${NAME}/exist"
@@ -23,6 +25,7 @@ AUTH="Authorization: Bearer ${MY_ACCESS_TOKEN}"
 
 #setup
 [ -d ${TEMP_DIR}/xq ] || mkdir -p ${TEMP_DIR}/xq
+[ -d modules/xq ] || mkdir -p modules/xq
 
 IMPORTS="${BIN_DIR}/xq-includes"
 if [ -d ${IMPORTS} ];then
@@ -81,10 +84,15 @@ import=
 queryFile=
 returns=
 response=
+contentType='application/xml'
+appPathPrefix="xmldb:exist:///db/apps/${NAME}"
 wrap='true'
 
 declare -a ARGS
 declare -a params
+
+###############################################################################
+
 
 if [ ! $ARGUMENTS -gt 0 ]; then
   xqUsage
@@ -95,9 +103,11 @@ $verbose  && echo "#${QUERY}#"
 # if we have a extended query or a interpolation heredoc
 # then create the query from the
 if [ $ARGUMENTS -eq 1 ]; then
-  if [ -e "bin/queries/${QUERY}.xq" ] ; then
-    queryFile="bin/queries/${QUERY}.xq"
+  if [ -e "modules/xq/${QUERY}.xq" ] ; then
+    queryFile="modules/xq/${QUERY}.xq"
+    $verbose  && echo "#${queryFile}#"
     query=$(<${queryFile})
+    $verbose  && echo "${query}"
   fi
   ARGS=()
 else
@@ -108,14 +118,101 @@ fi
 
 $verbose  && echo "INFO! - *QUERY* [ ${QUERY} ]"
 
-###############################################################################
+# logs
+################################################
+[ -d ${TEMP_DIR}/xq ] || mkdir -p ${TEMP_DIR}/xq
+[ -d q${LOG_DIR}/xq ]  || mkdir -p ${LOG_DIR}/xq
+TEMP_XML="${TEMP_DIR}/xq/${QUERY}.xml"
+LOG_FILE="${LOG_DIR}/xq/${QUERY}.log"
+
+# UTILITY FUNCTIONS
+###################################
+
+function getExistValueText( ){
+FILE="${CWD}/${TEMP_XML}"
+NS="declare namespace exist = '${NS}'"
+EXIST_VALUE=$(java -cp $SAXON \
+  net.sf.saxon.Query \
+  \!method=text \
+  -qversion:3.0  \
+  -qs:"${NS};doc('file://${FILE}')//exist:value/string()"\
+  )
+}
+
+function getExistValue( ){
+FILE="${CWD}/${TEMP_XML}"
+NS="declare namespace exist = '${NS}'"
+java -cp $SAXON \
+  net.sf.saxon.Query \
+  \!method=text \
+  -qversion:3.0  \
+  -qs:"${NS};doc('file://${FILE}')//exist:value/string()"
+}
+
+
+function getPermission( ){
+FILE="${CWD}/${TEMP_XML}"
+NS='declare namespace sm = "http://exist-db.org/xquery/securitymanager"'
+EXIST_VALUE=$(java -cp $SAXON \
+  net.sf.saxon.Query \
+  \!method=text \
+  -qversion:3.0  \
+  -qs:"${NS};doc('file://${FILE}')//sm:permission/@${1}/string()"\
+  )
+}
+
+function getXML( ){
+FILE="${CWD}/${TEMP_XML}"
+NS="declare namespace exist = '${NS}'"
+java -cp $SAXON \
+  net.sf.saxon.Query \
+  \!method=xml \
+  \!indent=yes \
+  \!omit-xml-declaration=yes \
+  -qversion:3.0  \
+  -qs:"${NS};doc('file://${FILE}')/node()"
+}
+
+function getJSON( ){
+echo "$(<${TEMP_XML})" | jq '.'
+}
+
+function getMimeType( ){
+saxonQuery  "doc('file:///${EXIST_HOME}/mime-types.xml')//mime-type[matches(./extensions,'${1},|${1}$')]/@name/string()"
+}
+
+function saxonQuery(){
+java -cp $SAXON \
+  net.sf.saxon.Query \
+  \!method=text \
+  -qversion:3.0 \
+  -qs:"${1}"
+}
+
+# MAIN SWITCH
+##############
 
 case "$QUERY" in
   #LIST-START
+  scratch-xml)
+  params=( )
+  wrap='no'
+  returns='xml'
+  ;;
+  scratch-json)
+  params=( )
+  wrap='no'
+  contentType='application/json'
+  returns='json'
+  ;;
+  scratch-text)
+  params=( )
+  returns='text'
+  ;;
   list-modules)
   params=( )
   query="util:registered-modules()" 
-  returns=list
+  returns='list'
   ;;  #  SECURITY MANAGER
   groups-list)
   params=( )
@@ -126,23 +223,85 @@ case "$QUERY" in
   params=( )
   query="sm:list-users( )"
   returns='list'
+  ;;
+  permissions)
+  params=( route )
+  absPath=$(readlink -f $1)
+  relPath=${absPath#*${NAME}/}
+  path="${appPathPrefix}/${relPath}"
+  $verbose  && echo "${absPath}"
+  $verbose  && echo "${relPath}"
+  $verbose  && echo "${path}"
+  query="sm:get-permissions(xs:anyURI('${path}'))"
+  returns='permissions'
+  ;;
+  chmod)
+  params=( route mode )
+  absPath=$(readlink -f $1)
+  relPath=${absPath#*${NAME}/} 
+  route="${appPathPrefix}/${relPath}"
+  mode=${2}
+  $verbose  && echo "route: [ $route ]"
+  $verbose  && echo "mode: [ $mode ]"
+  query="sm:chmod(xs:anyURI('${route}'),'${mode}')"
+  returns='empty'
+  ;; # UTIL 
+  compile)
+  params=( file )
+  absPath=$(readlink -f $1)
+  relPath=$( echo "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+  $verbose  && echo "${absPath}"
+  $verbose  && echo "${relPath}"
+  modulePath=$( dirname "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+  appPath="xmldb:exist:///db/apps/${NAME}/$modulePath"
+  $verbose  && echo "${appPath}"
+  query="(util:compile(file:read('$absPath'),'$appPath'))"
+  returns='err'
+  ;;
+  uuid)
+  params=( )
+  query="util:uuid()"
+  returns='string'
   ;; #  XMLDB
   get-users)
   params=( group )
   query="xmldb:get-users( '$1' )"
   returns='list'
   ;;
-  uuid)
-  params=( )
-  query="util:uuid()"
+  store)
+  params=( file  )
+  absPath=$(readlink -f $1)
+  #relPath="${absPath#*${NAME}/}"
+  #xmldb:exist:///db/
+  route="xmldb:exist:///db/apps/${NAME}"
+  # directory="${absPath%${NAME}*}${NAME}/"
+  directory="$(pwd)"
+  pattern=${absPath#*${NAME}/}
+  ext=${pattern#*.}
+  mimeType="$( getMimeType ${ext} )"
+  # $verbose  && echo "${NAME}"
+  # $verbose  && echo "${absPath}"
+  # $verbose  && echo "${relPath}"
+  $verbose  && echo "${route}"
+  $verbose  && echo "${directory}"
+  $verbose  && echo "${pattern}"
+  # $verbose  && echo "${ext}"
+  $verbose  && echo "${mimeType}"
+  # $verbose  && echo "log: [ ${TEMP_XML} ]"
+  query="xmldb:store-files-from-pattern('${route}','${directory}','${pattern}','${mimeType}', true())"
   returns='string'
-  ;;
-  collection-list)
-  params=( route )
-  relPath=$1
-  path="${relPath}"
-  query="()"
-  returns='list'
+  ;; # exrest restxq
+	register)
+	params=( route )
+	absPath=$(readlink -f $1)
+  relPath=${absPath#*${NAME}/} 
+	path="${appPathPrefix}/${relPath}"
+  import='import module namespace exrest="http://exquery.org/ns/restxq/exist" at  "java:org.exist.extensions.exquery.restxq.impl.xquery.exist.ExistRestXqModule";'
+  $verbose  && echo "absPath  [ ${absPath}"
+  $verbose  && echo "relPath  [ ${relPath} ]"
+  $verbose  && echo "import  [ ${import} ]"
+  query="(exrest:register-module(xs:anyURI('$path')))"
+  returns='documentNode'
   ;;
   #LIST-END#
   *)
@@ -152,6 +311,7 @@ case "$QUERY" in
   exit
   ;;
 esac
+
 
 ###############################################################################
 
@@ -167,7 +327,6 @@ if [[ ${#params[@]} -ne ${#ARGS[@]} ]] ; then
 fi
 
 function postQuery( ){
-
 $verbose && echo 'POSTing to eXist'
 
 local max=9999
@@ -188,14 +347,13 @@ ${query}
 EOF
 )"
 
-TEMP_XML="${TEMP_DIR}/xq/${QUERY}.xml"
 if [ -e  ${TEMP_XML} ] ; then
   rm ${TEMP_XML}
 fi
 
 local doRequest=$(
 curl -s \
-  -H "Content-Type: application/xml" \
+  -H "Content-Type: ${contentType}" \
   -H "${AUTH}" \
   -o ${TEMP_XML} \
   -w "%{http_code}" \
@@ -226,32 +384,10 @@ case "${doRequest}" in
 esac
 }
 
-function getExistValueText( ){
-FILE="${CWD}/${TEMP_XML}"
-NS="declare namespace exist = '${NS}'"
-EXIST_VALUE=$(java -cp $SAXON \
-  net.sf.saxon.Query \
-  \!method=text \
-  -qversion:3.0  \
-  -qs:"${NS};doc('file://${FILE}')//exist:value/string()"\
-  )
-}
-
-function getPermission( ){
-FILE="${CWD}/${TEMP_XML}"
-NS='declare namespace sm = "http://exist-db.org/xquery/securitymanager"'
-EXIST_VALUE=$(java -cp $SAXON \
-  net.sf.saxon.Query \
-  \!method=text \
-  -qversion:3.0  \
-  -qs:"${NS};doc('file://${FILE}')//sm:permission/@${1}/string()"\
-  )
-}
-
-###############################################################################
-
+#  \!omit-xml-declaration=yes \
 # post to eXist, store response a temp xml file
 # use saxon to extract bash strings or arrays that can be piped
+
 
 if postQuery ; then
   case "$returns" in
@@ -278,11 +414,21 @@ if postQuery ; then
       $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
       echo "$response" > ${STRING_RESPONSE}
       ;;
+    text)
+      response=$( getExistValue )
+      ;;
+    json)
+      $verbose  &&  getJSON
+      response=$( getJSON )
+      ;;
+    xml)
+      response=$( getXML )
+      ;;
     element)
       echo $(<${TEMP_XML})
       ;;
     documentNode)
-      echo "$(<${TEMP_XML})"
+      echo "$(<${TEMP_XML})"  | tidy -q -xml -utf8 -indent --indent-attributes 1 --indent-spaces 1
       ;;
     permissions)
       getPermission mode
@@ -385,6 +531,11 @@ if postQuery ; then
     string)
       getExistValueText
       response="${EXIST_VALUE}"
+      if [ -z $response  ] ; then
+        echo "ERROR: expected string got nothing" >&2
+        false;
+        exit 1
+      fi
       $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
       ;;
     stdout)

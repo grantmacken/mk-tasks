@@ -18,7 +18,6 @@ will use stow to
 3. symlink node package.json file to one level up
 4. symlink project Makefile  `.tasks`dir into each web project.
 
-
 ##node notes:
 
 when calling node from a web project dir, node will move up the dir tree looking for node_modules dir
