@@ -262,6 +262,23 @@ case "$QUERY" in
   params=( )
   query="util:uuid()"
   returns='string'
+  ;; # REPO
+  repo-remove)
+  params=( website )
+  $verbose  && echo "${1}"
+  query="repo:remove('${1}')"
+  returns='boolean'
+  ;;
+  repo-undeploy)
+  params=( website )
+  $verbose  && echo "${1}"
+  query="repo:undeploy('${1}')"
+  returns='repo_status'
+  ;;
+  repo-deploy)
+  params=( website download_url )
+  query="repo:install-and-deploy('${1}', '${2}')"
+  returns='repo_status'
   ;; #  XMLDB
   get-users)
   params=( group )
@@ -583,16 +600,17 @@ if postQuery ; then
       # echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
       ;;
     repo_status)
-      nSTR="\
-        n = require('cheerio').load('$(echo $(<${TEMP_XML}))',\
-        {xmlMode: true})('status');\
-          console.log( 'EXIST_REPO_RESULT=' + n.attr('result') );\
-          console.log( 'EXIST_REPO_TARGET=' + n.attr('target') );\
-          "
-      source <(node -e "${nSTR}")
-      response="${EXIST_REPO_RESULT}: ${EXIST_REPO_TARGET}"
-      $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
-      echo "${response}" >  ${LOG_FILE}
+       echo $(<${TEMP_XML}) 
+      # nSTR="\
+      #   n = require('cheerio').load('$(echo $(<${TEMP_XML}))',\
+      #   {xmlMode: true})('status');\
+      #     console.log( 'EXIST_REPO_RESULT=' + n.attr('result') );\
+      #     console.log( 'EXIST_REPO_TARGET=' + n.attr('target') );\
+      #     "
+      # source <(node -e "${nSTR}")
+      # response="${EXIST_REPO_RESULT}: ${EXIST_REPO_TARGET}"
+      # $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
+      # echo "${response}" >  ${LOG_FILE}
       ;;
     *)
       echo "FAILURE! - no return value set"

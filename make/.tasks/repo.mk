@@ -112,9 +112,10 @@ $(G)/branch.json: $(G)/issue.json $(G)/issues.json
 	@echo "$(shell echo $$(< $(<)) | jq '[.labels[0].name ,.number, .title ] | .[] | @sh ' )"
 	$(if $(isMaster),gh -v create-branch-from-current-issue,)
 	$(call chkJson,$@)
+	@$(if $$(gh latest-tag),\
+ $(shell sed -i -r "s/^SEMVER=.*/SEMVER=$$(gh latest-tag)/" config) , )
 	@echo "}}}"
 
-#}}}
 
 ###############################################################################
 # PULL REQUEST PHASE
@@ -129,7 +130,6 @@ pr:
 	@$(MAKE) pull-request
 	@$(MAKE) pr-shipit
 	@$(MAKE) pr-status
-	@$(MAKE) pr-merge
 	@$(MAKE) pr-merge
 
 
@@ -243,7 +243,10 @@ pr-merged: config
 	@echo 'latest milestone: ' $$(gh latest-milestone)
 	@gh update-semver  $$(gh latest-tag)  $$(gh latest-milestone)
 	@sed -i -r "s/^SEMVER=.*/SEMVER=$$(gh update-semver $$(gh latest-tag) $$(gh latest-milestone))/" config
+	@$(MAKE) build
 	@$(MAKE) package
+	@$(MAKE) release
+	@$(MAKE) upload
 
 # }}}
 ###############################################################################
@@ -274,9 +277,9 @@ $(G)/release.json: $(XAR)
 	@$(info create release using following params)
 	@$(info tag-name: $(VERSION))
 	@$(info name: $(ABBREV)-$(VERSION))
-	@$(info body: $(shell echo $$(<$(JSN_PULL_REQUEST)) | jq '.body | @sh'))
+	@$(info body: $(shell echo $$(<$(G)/pull-request.json) | jq '.body | @sh'))
 	@$(info xar: $(wildcard $(XAR)))
-	@gh create-release "v$(VERSION)" "$(ABBREV)-$(VERSION)" "$(shell echo $$(<$(JSN_PULL_REQUEST)) | jq '.body | @sh')"
+	@gh create-release "v$(VERSION)" "$(ABBREV)-$(VERSION)" "$(shell echo $$(<$(G)/pull-request.json) | jq '.body | @sh')"
 	@echo "}}}"
 
 $(G)/asset_uploaded.json: $(G)/release.json
@@ -308,11 +311,23 @@ $(G)/tags.json: $(G)/latest-release.json
 	@git stash
 	@echo 'Pull in tags'
 	@git pull --tags
-	@echo 'pop back the config file which contains the semver'
-	@git stash pop
-	@git tag
-	@cat config
 	@echo "------------------------------------------------------------------ "
+
+tag-semver-sync:
+	@sed -i -r "s/^SEMVER=.*/SEMVER=$$(gh latest-tag)/" config
+	@cat config
+	@$(if $(shell gh latest-tag),\
+ $(shell sed -i -r "s/^SEMVER=.*/SEMVER=$$(gh latest-tag)/" config) ,\
+ $(info  no latest tag))
+	@echo "}}}"
+
+
+# @echo 'pop back the config file which contains the semver'
+# @git stash pop
+# @git tag
+# @cat config
+# @gh update-semver $$(gh latest-tag) $$(gh latest-milestone)
+# @gh latest-milestone
 #}}}
 ###############################################################################
 # DEPLOYMENTo
@@ -355,7 +370,6 @@ deploy-local:
 	@echo "name: $(releaseName)"
 	@echo "WEBSITE: $(WEBSITE)"
 	@echo "browser_download_url: $(releaseDownloadUrl)"
-	@xq -v repo-deploy-local $(WEBSITE) $(releaseDownloadUrl)
 	@echo "------------------------------------------------------"
 
 deploy-remote:
@@ -368,6 +382,7 @@ deploy-remote:
 
 # $(JSN_DEPLOYMENT_STATUS): $(JSN_DEPLOYMENT)
 #
+# @xq -v repo-deploy-local $(WEBSITE) $(releaseDownloadUrl)
 # @xq -v repo-deploy-local $(WEBSITE) $(releaseDownloadUrl)
 # 	@gh create-deployment "$(shell echo $$(<$(JSN_LATEST_RELEASE)) | jq '.tag_name')"
 # 	@echo "##[ $@ ]##"

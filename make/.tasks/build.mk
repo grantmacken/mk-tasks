@@ -50,7 +50,7 @@ package-clean:
 	@rm $(XAR)
 
 # use cheerio as simple xml parser
-$(B)/repo.xml: $(P)/repo.xml $(CONFIG_FILE)
+$(B)/repo.xml: $(P)/repo.xml config
 	@echo "##[ $@ ]##"
 	@echo  "SRC  $< "
 	@node -e "\
@@ -67,7 +67,7 @@ $(B)/repo.xml: $(P)/repo.xml $(CONFIG_FILE)
 	@cat $@
 	@echo "------------------------------------------------------------------ "
 
-$(B)/expath-pkg.xml: $(P)/expath-pkg.xml $(CONFIG_FILE)
+$(B)/expath-pkg.xml: $(P)/expath-pkg.xml config
 	@echo  "MODIFY $@"
 	@echo "##[ $@ ]##"
 	@echo  "SRC  $< "

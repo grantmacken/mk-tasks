@@ -3,7 +3,8 @@ print-enviroment:
 	@printenv
 
 help:
-	@echo 'NODE_BIN_DIR ': $(abspath $(NODE_BIN_DIR))
+	@echo 'BIN_DIR ': $(abspath ../bin)
+	@echo 'SAXON ': $(SAXON)
 	@echo 'REPO_SLUG': $(REPO_SLUG)
 	@echo 'OWNER': $(OWNER)
 	@echo 'REPO': $(REPO)

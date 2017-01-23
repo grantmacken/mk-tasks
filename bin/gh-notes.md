@@ -6,6 +6,13 @@
 2. creating pull request and merging back into master
 3. creating a release and deployable release asset
 
+### Quick Start
+
+1. `make issue && make branch`
+2. `make sync-issue
+3. `make pr`
+
+
 a social github work flow
 -------------------------
 
@@ -38,7 +45,7 @@ TODO! not yet happy with 3
 
 Don't push until ready for a pull request
     - `git commit -am ''` combined changes into commit
-    - `git rebase -i @{u
+    - `git rebase -i @{u}
 
 m content/pages/about/micropub-api.md
 nvim
