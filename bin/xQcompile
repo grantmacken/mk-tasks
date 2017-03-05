@@ -1,0 +1,78 @@
+#!/bin/bash +x
+####################
+# gf  ../../dotfiles/nvim/compiler/xQcompile.vim
+
+[ ! -e "config" ] &&  exit
+source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+[ ! -e "../common.properties" ] &&  exit
+source ../common.properties
+[ ! -e "../project.properties" ] &&  exit
+source ../project.properties
+
+verbose=false
+
+ # params=( file )
+absPath=$(readlink -f $1)
+relPath=$( echo "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+$verbose  && echo "abs-path [ ${absPath} ]"
+$verbose  && echo "rel-path [ ${relPath} ]"
+moduleLoadPath=$( dirname "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+appPath="xmldb:exist:///db/apps/${NAME}/$modulePath"
+$verbose  && echo "app-path: [ ${appPath} ]"
+endpoint="https://${NAME}/exist"
+$verbose  && echo "endpoint [ ${endpoint} ]"
+auth="Authorization: Bearer ${SITE_ACCESS_TOKEN}" 
+# $verbose  && echo "auth [ ${auth} ]"
+contentType='Content-Type: application/xml'
+$verbose  && echo "content-type[ ${contentType} ]"
+max='1'
+postData="$(
+cat <<EOF
+<query xmlns='http://exist.sourceforge.net/NS/exist'
+ start='1'
+ wrap='no'
+ max='${max}'>
+<text><![CDATA[
+xquery version '3.1';
+declare boundary-space preserve;
+declare namespace output = "http://www.w3.org/2010/xslt-xquery-serialization";
+declare option output:method "text";
+declare option output:media-type "text/plain";
+declare option output:item-separator "&#10;";
+declare option output:encoding "UTF-8";
+let \$compiled :=
+if( file:is-readable('${absPath}') ) then (
+  util:compile-query(file:read('${absPath}'),'${moduleLoadPath}' )
+) else (
+)
+return (
+if ( \$compiled/@result/string() eq 'fail'  ) then (
+ '${relPath}:' || \$compiled/error/@line/string() || ':' || \$compiled/error/@column/string() || ':E: ' || \$compiled/error/text() 
+  ) else ()
+)
+]]></text>
+</query>
+EOF
+)"
+# ${moduleLoadPath}
+# CompilerSet errorformat+=%f:%l:%t:\ %
+# '${absPath'
+# echo "${postData}"
+
+echoERR() { printf "%s\n" "$*" >&2; }
+
+result=$(curl -s --http1.1 \
+ -H "$auth" \
+ -H "$contentType" \
+ -d "$postData" \
+ $endpoint)
+
+if [ -n "${result}" ]; then 
+ echoERR "${result}"
+ exit 1
+else
+  exit 0
+fi
+
+
+

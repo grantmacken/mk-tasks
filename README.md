@@ -16,7 +16,7 @@ will use stow to
 1. symlink to bin dir one level up
 2. symlink properties files to one level up
 3. symlink node package.json file to one level up
-4. symlink project Makefile  `.tasks`dir into each web project.
+4. symlink project Makefile and make includes into `.tasks`dir into each web project.
 
 ##node notes:
 

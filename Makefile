@@ -16,7 +16,10 @@ build:
 	stow -t $(UP_TARG_DIR) properties
 	stow -t $(UP_TARG_DIR) node
 	stow -t $(gmack) make
-	stow -t $(example) make
+
+properties:
+	@stow -v -t $(UP_TARG_DIR) properties
+
 
 clean:
 	@stow -D -t  $(UP_TARG_DIR)/bin bin
@@ -29,4 +32,4 @@ install:
 	@echo $(UP_TARG_DIR)
 	@cd $(UP_TARG_DIR) && npm install
 
-.PHONY: build clean install info
+.PHONY: properties build clean install info

@@ -1,5 +1,5 @@
 #==========================================================
-#  XQUERY MODULES
+#  MODULES
 #  modules is the working directory for xquery modules
 #  {project}/modules
 #  in vim it is invoke on 'update'
@@ -64,17 +64,13 @@ watch-modules:
 .PHONY:  watch-modules 
 
 #############################################################
-# @$(if $(findstring api/,$*),\
-# xQ register '$<'  && \
-# echo 'registered api module', )
-# Copy over xqm query modules into build
 
 $(B)/modules/%: modules/%
 	@echo "## $@ ##"
 	@[ -d @D ] || mkdir -p $(@D)
 	@echo "SRC: [ $< ]"
 	@echo "STEM: [ $* ]"
-	@xQ compile $< && echo "checked if eXist can compile the module"
+	@xQcompile $< && echo "checked if eXist can compile the module"
 	@xQ store $< && echo "stored module into eXist" 
 	@$(if $(shell xQ permissions $< | grep 'rwxrwxr-x'),,\
  xQ chmod '$<' 'rwxrwxr-x' && \

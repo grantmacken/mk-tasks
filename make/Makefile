@@ -1,5 +1,5 @@
 include config
-# include ../common.properties
+include ../common.properties
 SHELL=/bin/bash
 export PATH := $(abspath ../bin):$(abspath ../node_modules/.bin):$(PATH)
 # dir shortcuts
@@ -11,11 +11,11 @@ D := deploy
 P := pkg
 
 #common paths 
-EXIST_HOME := /usr/local/eXist
-EXIST_DATA_DIR := webapp/WEB-INF/data
-WEBDAV := ~/eXist
-SAXON := $(wildcard $(EXIST_HOME)/lib/endorsed/Saxon*.jar )
-OPENRESTY_HOME := /usr/local/openresty
+# EXIST_HOME := /usr/local/eXist
+# EXIST_DATA_DIR := webapp/WEB-INF/data
+# WEBDAV := ~/eXist
+# SAXON := $(wildcard $(EXIST_HOME)/lib/endorsed/Saxon*.jar )
+# OPENRESTY_HOME := /usr/local/openresty
 
 # keep intermediate files
 # http://stackoverflow.com/questions/3046117/gnu-makefile-multiple-outputs-from-single-rule-preventing-intermediate-files

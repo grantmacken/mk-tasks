@@ -38,7 +38,7 @@ $(L)/templates/%.log: $(B)/templates/%.html
 	@echo "eXist store pattern: : $(subst build/,,$(<)) "
 	@echo "mime-type: $(call getMimeType,$(suffix $(notdir $(<))))"
 	@echo "stored log path : $(basename $(subst build/,,$(<)))"
-	@echo "stored log dir : $(L)/$(dir $(subst build/,,$(<)))"
+	@echo "stored log dir : $(L)/$(dir $(subst build/,-,$(<)))"
 	@echo "dir : $(shell cut -d '/' -f1 <<< '$*') "
 	@mkdir -p $(L)/$(dir $(subst build/,,$(<)))
 	@xq store-built-resource \

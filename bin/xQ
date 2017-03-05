@@ -2,20 +2,13 @@
 ####################
 [ ! -e "config" ] &&  exit
 source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
-CWD=$(pwd)
-BIN_DIR='../bin'
-TEMP_DIR='.temp'
-LOG_DIR='.logs'
-GIT_USER="$( git config --get user.name )"
-GIT_EMAIL="$( git config --get user.email )"
-GITHUB_ACCESS_TOKEN="$(<../.access-token)"
-MY_ACCESS_TOKEN="$(<../.me-access-token)"
-EXIST_HOME='/usr/local/eXist'
-SAXON='/usr/local/eXist/lib/endorsed/Saxon-HE-9.6.0-7.jar'
-NS='http://exist.sourceforge.net/NS/exist'
+[ ! -e "../common.properties" ] &&  exit
+source ../common.properties
+[ ! -e "../project.properties" ] &&  exit
+source ../project.properties
 
 ENDPOINT="https://${NAME}/exist"
-AUTH="Authorization: Bearer ${MY_ACCESS_TOKEN}" 
+AUTH="Authorization: Bearer ${SITE_ACCESS_TOKEN}" 
 
 # Notes: Unlike 'xq' this bash  script makes a curl call over https to the websites  'endpoint' 
 # authorised access to the endpoint is obtained be  using a verified  jwt token 
@@ -24,7 +17,7 @@ AUTH="Authorization: Bearer ${MY_ACCESS_TOKEN}"
 # relative paths:  the rest query is executed from athe apps context  /exist/rest/apps/${NAME}"
 
 #setup
-[ -d ${TEMP_DIR}/xq ] || mkdir -p ${TEMP_DIR}/xq
+[ -d ${T}/xq ] || mkdir -p ${T}/xq
 [ -d modules/xq ] || mkdir -p modules/xq
 
 IMPORTS="${BIN_DIR}/xq-includes"
@@ -49,10 +42,11 @@ if [ -d ${IMPORTS} ];then
     exit 1
 fi
 
+
 ###################################
 
 verbose=false
-while getopts "h r v l" OPTION
+while getopts "h  v" OPTION
 do
   case $OPTION in
     h)
@@ -60,11 +54,11 @@ do
         exit 1
       fi
     ;;
-    l)
-      if xqListAvailableQueries ; then
-          exit 1
-      fi
-    ;;
+    # l)
+    #   if xqListAvailableQueries ; then
+    #       exit 1
+    #   fi
+    # ;;
     v)
       verbose=true
       shift
@@ -73,6 +67,7 @@ do
   ;;
   esac
 done
+exit
 
 # DECLARE GLOBALS
 ###################################
@@ -120,38 +115,38 @@ $verbose  && echo "INFO! - *QUERY* [ ${QUERY} ]"
 
 # logs
 ################################################
-[ -d ${TEMP_DIR}/xq ] || mkdir -p ${TEMP_DIR}/xq
-[ -d q${LOG_DIR}/xq ]  || mkdir -p ${LOG_DIR}/xq
-TEMP_XML="${TEMP_DIR}/xq/${QUERY}.xml"
-LOG_FILE="${LOG_DIR}/xq/${QUERY}.log"
+[ -d ${T}/xq ] || mkdir -p ${T}/xq
+[ -d ${L}/xq ]  || mkdir -p ${L}/xq
+TEMP_XML="${T}/xq/${QUERY}.xml"
+LOG_FILE="${L}/xq/${QUERY}.log"
 
 # UTILITY FUNCTIONS
 ###################################
 
 function getExistValueText( ){
-FILE="${CWD}/${TEMP_XML}"
-NS="declare namespace exist = '${NS}'"
+local file="${TEMP_XML}"
+local ns="declare namespace exist = '${NS}'"
 EXIST_VALUE=$(java -cp $SAXON \
   net.sf.saxon.Query \
   \!method=text \
   -qversion:3.0  \
-  -qs:"${NS};doc('file://${FILE}')//exist:value/string()"\
+  -qs:"${ns};doc('file://${file}')//exist:value/string()"\
   )
 }
 
 function getExistValue( ){
-FILE="${CWD}/${TEMP_XML}"
-NS="declare namespace exist = '${NS}'"
+local file="${TEMP_XML}"
+local ns="declare namespace exist = '${NS}'"
 java -cp $SAXON \
   net.sf.saxon.Query \
   \!method=text \
   -qversion:3.0  \
-  -qs:"${NS};doc('file://${FILE}')//exist:value/string()"
+  -qs:"${ns};doc('file://${file}')//exist:value/string()"
 }
 
 
 function getPermission( ){
-FILE="${CWD}/${TEMP_XML}"
+FILE="${TEMP_XML}"
 NS='declare namespace sm = "http://exist-db.org/xquery/securitymanager"'
 EXIST_VALUE=$(java -cp $SAXON \
   net.sf.saxon.Query \
@@ -573,7 +568,7 @@ if postQuery ; then
       $verbose  && echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
       echo "SUCCESS! - *RESPONSE*: [ ${response} ]"
 
-      stored_log=${LOG_DIR}/${log}.log
+      stored_log=${L}/${log}.log
       # [ -e ${stored_log} ] && rm ${stored_log}
       [ -n "${response}" ] && echo "${response}" > ${stored_log}
       exit 0

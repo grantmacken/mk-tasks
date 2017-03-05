@@ -1,0 +1,106 @@
+#!/bin/bash +x
+####################
+# gf  ../../dotfiles/nvim/compiler/xQcompile.vim
+
+verbose=false
+
+[ ! -e "config" ] &&  exit
+source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+[ ! -e "../common.properties" ] &&  exit
+source ../common.properties
+[ ! -e "../project.properties" ] &&  exit
+source ../project.properties
+
+# [ ! -d "build" ] && mkdir build
+# [ ! -d "deploy" ] && mkdir deploy
+# [ ! -d ".github" ] && mkdir '.github'
+
+
+function getMimeType( ){
+saxonQuery  "doc('file:///${EXIST_HOME}/mime-types.xml')//mime-type[matches(./extensions,'${1},|${1}$')]/@name/string()"
+}
+
+function saxonQuery(){
+java -cp $SAXON \
+  net.sf.saxon.Query \
+  \!method=text \
+  -qversion:3.0 \
+  -qs:"${1}"
+}
+
+function echoERR() {
+  printf "%s\n" "$*" >&2;
+}
+
+if [ ! -e ${1} ]; then
+  echoERR  "file does not exist"
+  exit 1
+fi 
+
+# $verbose  && echo "SAXON [ ${SAXON} ]"
+# $verbose  && echo "EXIST HOME  [ ${EXIST_HOME} ]"
+domain=${NAME}
+# $verbose  && echo "domain [ ${domain} ]"
+
+absPath=$(readlink -f $1)
+relPath=${absPath#*${NAME}/} 
+$verbose  && echo "abs-path [ ${absPath} ]"
+$verbose  && echo "rel-path [ ${relPath} ]"
+route="xmldb:exist:///db/apps/${NAME}"
+$verbose  && echo "route [ ${route} ]"
+# directory="${absPath%${NAME}*}${NAME}/"
+directory="$(pwd)/build"
+$verbose  && echo "directory [ ${directory} ]"
+pattern=${absPath#*build/}
+$verbose  && echo "pattern [ ${pattern} ]"
+ext=${pattern#*.}
+$verbose  && echo "ext [ ${ext} ]"
+if [ $ext == 'svgz' ]; then
+ mimeType='application/zip'
+else
+  mimeType="$( getMimeType ${ext})"
+fi
+# TODO! saxon will throw error if mimetype not found
+$verbose  && echo "mimeType [ ${mimeType} ]"
+max='1'
+postData="$(
+cat <<EOF
+<query xmlns='http://exist.sourceforge.net/NS/exist'
+ start='1'
+ wrap='no'
+ max='${max}'>
+<text><![CDATA[
+xquery version '3.1';
+xmldb:store-files-from-pattern('${route}','${directory}','$pattern','${mimeType}', true())
+]]></text>
+</query>
+EOF
+)"
+$verbose  && echo "${postData}"
+
+endpoint="https://${NAME}/exist"
+# $verbose  && echo "endpoint [ ${endpoint} ]"
+auth="Authorization: Bearer ${SITE_ACCESS_TOKEN}" 
+# $verbose  && echo "auth [ ${auth} ]"
+contentType='Content-Type: application/xml'
+$verbose  && echo "content-type[ ${contentType} ]"
+
+result=$(curl -s --http1.1 \
+ -H "$auth" \
+ -H "$contentType" \
+ -d "$postData" \
+ $endpoint)
+
+echo $result
+
+if [ -z "${result}" ]; then 
+ echoERR "${relPath}:1:1:E: eXist could not store file"
+ exit 1
+else
+  sleep 1
+  exit 0
+fi
+
+
+
+

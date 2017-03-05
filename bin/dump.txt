@@ -1,0 +1,121 @@
+
+#!/bin/bash +x
+####################
+# gf  ../../dotfiles/nvim/compiler/xQcompile.vim
+
+verbose=true
+
+[ ! -e "config" ] &&  exit
+source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+[ ! -e "../common.properties" ] &&  exit
+source ../common.properties
+[ ! -e "../project.properties" ] &&  exit
+source ../project.properties
+
+# [ ! -d "build" ] && mkdir build
+# [ ! -d "deploy" ] && mkdir deploy
+# [ ! -d ".github" ] && mkdir '.github'
+
+
+function getMimeType( ){
+saxonQuery  "doc('file:///${EXIST_HOME}/mime-types.xml')//mime-type[matches(./extensions,'${1},|${1}$')]/@name/string()"
+}
+
+function saxonQuery(){
+java -cp $SAXON \
+  net.sf.saxon.Query \
+  \!method=text \
+  -qversion:3.0 \
+  -qs:"${1}"
+}
+
+function echoERR() {
+  printf "%s\n" "$*" >&2;
+}
+
+if [ ! -e ${1} ]; then
+  echoERR  "file does not exist"
+  exit 1
+fi 
+
+# $verbose  && echo "SAXON [ ${SAXON} ]"
+# $verbose  && echo "EXIST HOME  [ ${EXIST_HOME} ]"
+domain=${NAME}
+# $verbose  && echo "domain [ ${domain} ]"
+
+absPath=$(readlink -f $1)
+relPath=${absPath#*${NAME}/} 
+baseName=$(basename ${relPath})
+$verbose  && echo "abs-path [ ${absPath} ]"
+$verbose  && echo "rel-path [ ${relPath} ]"
+$verbose  && echo "base-name  [ ${baseName} ]"
+# directory="${absPath%${NAME}*}${NAME}/"
+directory="$(pwd)"
+$verbose  && echo "directory [ ${directory} ]"
+pattern=$(dirname ${relPath#*build/})
+$verbose  && echo "pattern [ ${pattern} ]"
+route="xmldb:exist:///db/apps/${NAME}/${pattern}"
+$verbose  && echo "route [ ${route} ]"
+ext=${baseName#*.}
+$verbose  && echo "ext [ ${ext} ]"
+mimeType="$( getMimeType ${ext})"
+# TODO! saxon will throw error if mimetype not found
+$verbose  && echo "mimeType [ ${mimeType} ]"
+max='1'
+postData="$(
+cat <<EOF
+<query xmlns='http://exist.sourceforge.net/NS/exist'
+ start='1'
+ wrap='no'
+ max='${max}'>
+<text><![CDATA[
+xquery version '3.1';
+if( file:is-readable('${absPath}') ) then (
+xmldb:store-as-binary('$route','$baseName',file:read-binary('${absPath}'),'$mimeType')
+) else ()
+]]></text>
+</query>
+EOF
+)"
+$verbose  && echo "${postData}"
+# xmldb:store('$route','$baseName',file:read('${absPath}'),'$mimeType')
+# declare boundary-space preserve;
+# declare namespace output = "http://www.w3.org/2010/xslt-xquery-serialization";
+# declare option output:method 'text';
+# declare option output:media-type 'text/plain';
+# declare option output:encoding 'UTF-8';
+# declare option output:item-separator "&#10;";
+ # 
+# let \$msg1 := xmldb:collection-available('${route}')
+# let \$msg2 := file:is-directory('$directory')
+# let \$msg3 := file:list('$directory')
+# return (
+# \$msg3
+endpoint="https://${NAME}/exist"
+# $verbose  && echo "endpoint [ ${endpoint} ]"
+auth="Authorization: Bearer ${SITE_ACCESS_TOKEN}" 
+# $verbose  && echo "auth [ ${auth} ]"
+contentType='Content-Type: application/xml'
+$verbose  && echo "content-type[ ${contentType} ]"
+
+result=$(curl -s --http1.1 \
+ -H "$auth" \
+ -H "$contentType" \
+ -d "$postData" \
+ $endpoint)
+
+echo $result
+
+
+
+if [ -z "${result}" ]; then 
+ echoERR "${relPath}:1:1:E: eXist could not store file"
+ exit 1
+else
+  sleep 1
+  exit 0
+fi
+
+
+
+
