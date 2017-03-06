@@ -2,7 +2,7 @@
 ####################
 # gf  ../../dotfiles/nvim/compiler/xQcompile.vim
 
-verbose=false
+verbose=true
 
 [ ! -e "config" ] &&  exit
 source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
@@ -15,9 +15,9 @@ source ../project.properties
 # [ ! -d "deploy" ] && mkdir deploy
 # [ ! -d ".github" ] && mkdir '.github'
 
-
+# NOTE! xQuery matches uses regex 
 function getMimeType( ){
-saxonQuery  "doc('file:///${EXIST_HOME}/mime-types.xml')//mime-type[matches(./extensions,'${1},|${1}$')]/@name/string()"
+saxonQuery  "doc('file:///${EXIST_HOME}/mime-types.xml')//mime-type[matches(./extensions,'(^\\.${1},)|,\\.${1},|\\.${1}$')]/@name/string()"
 }
 
 function saxonQuery(){
@@ -40,12 +40,13 @@ fi
 # $verbose  && echo "SAXON [ ${SAXON} ]"
 # $verbose  && echo "EXIST HOME  [ ${EXIST_HOME} ]"
 domain=${NAME}
-# $verbose  && echo "domain [ ${domain} ]"
-
+$verbose  && echo "domain [ ${domain} ]"
 absPath=$(readlink -f $1)
-relPath=${absPath#*${NAME}/} 
+relPath=${absPath#*${domain}/} 
+baseName=$(basename $relPath)
 $verbose  && echo "abs-path [ ${absPath} ]"
 $verbose  && echo "rel-path [ ${relPath} ]"
+$verbose  && echo "base name [ ${baseName} ]"
 route="xmldb:exist:///db/apps/${NAME}"
 $verbose  && echo "route [ ${route} ]"
 # directory="${absPath%${NAME}*}${NAME}/"
@@ -53,7 +54,7 @@ directory="$(pwd)/build"
 $verbose  && echo "directory [ ${directory} ]"
 pattern=${absPath#*build/}
 $verbose  && echo "pattern [ ${pattern} ]"
-ext=${pattern#*.}
+ext=${baseName#*.}
 $verbose  && echo "ext [ ${ext} ]"
 if [ $ext == 'svgz' ]; then
  mimeType='application/zip'
@@ -62,6 +63,8 @@ else
 fi
 # TODO! saxon will throw error if mimetype not found
 $verbose  && echo "mimeType [ ${mimeType} ]"
+
+exit 1
 max='1'
 postData="$(
 cat <<EOF
@@ -84,6 +87,7 @@ auth="Authorization: Bearer ${SITE_ACCESS_TOKEN}"
 # $verbose  && echo "auth [ ${auth} ]"
 contentType='Content-Type: application/xml'
 $verbose  && echo "content-type[ ${contentType} ]"
+
 
 result=$(curl -s --http1.1 \
  -H "$auth" \
