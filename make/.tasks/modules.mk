@@ -1,7 +1,7 @@
 
 define modulesHelp
 =========================================================
-TEMPLATES : working with eXist modules
+MODULES : working with eXist modules
  - extension html
 
     < src modules
@@ -13,7 +13,6 @@ TEMPLATES : working with eXist modules
 ==========================================================
 
 Tools Used: 
-
 
  Notes: path always relative to root
 
@@ -29,6 +28,76 @@ endef
 modules-help: export modulesHelp:=$(modulesHelp)
 modules-help:
 	echo "$${modulesHelp}"
+
+SRC_XQM := $(shell find modules -name '*.xqm' )
+SRC_XQ := $(shell find modules -name '*.xq' )
+BUILD_XQM := $(patsubst modules/%,$(B)/modules/%,$(SRC_XQM))
+BUILD_XQ := $(patsubst modules/%,$(B)/modules/%,$(SRC_XQ))
+UPLOAD_MODULE_LOGS := $(patsubst %.xqm,$(L)/%.log,$(SRC_XQM)) $(patsubst %.xq,$(L)/%.log,$(SRC_XQ))
+
+# $(info $(UPLOAD_MODULE_LOGS) )
+
+modules: $(L)/upModules.log
+
+watch-modules:
+	@watch -q $(MAKE) modules
+
+.PHONY:  watch-modules
+
+#############################################################
+
+$(B)/modules/%.xqm: modules/%.xqm
+	@echo "##  $*  ##"
+	@[ -d @D ] || mkdir -p $(@D)
+	@echo "src: [ $< ]"
+	@xQcompile $< && echo "checked if exist can compile the module"
+	@cp $< $@ && echo 'copied files into build directory'
+	@echo '-----------------------------------------------------------------'
+
+$(B)/modules/%.xq: modules/%.xq
+	@echo "##  $*  ##"
+	@[ -d @D ] || mkdir -p $(@D)
+	@echo "src: [ $< ]"
+	@xQcompile $< && echo "checked if exist can compile the module"
+	@cp $< $@ && echo 'copied files into build directory'
+	@echo '-----------------------------------------------------------------'
+
+$(L)/modules/%.log: $(B)/modules/%.xqm 
+	@echo "## $@ ##" 
+	@[ -d @D ] || mkdir -p $(@D)
+	@echo 'Upload $(basename $@) to eXist'
+	@xQstore $< > $@
+	@echo "Uploaded eXist path: [ $$(cat $@) ]"
+
+$(L)/modules/%.log: $(B)/modules/%.xq
+	@echo "## $@ ##" 
+	@[ -d @D ] || mkdir -p $(@D)
+	@echo 'Upload $(basename $@) to eXist'
+	@xQstore $< > $@
+	@echo "Uploaded eXist path: [ $$(cat $@) ]"
+# @echo 'Check xQuery $(basename $@) permissions set correctly'
+# @xQperm '$<' 'rwxrwxr-x'
+
+
+$(L)/upModules.log: $(UPLOAD_MODULE_LOGS)
+	@$(MAKE) --silent $(UPLOAD_MODULE_LOGS)
+	@echo '' > $@ 
+	@for log in $(UPLOAD_MODULE_LOGS); do \
+ cat $$log >> $@ ; \
+ done
+	@echo "$$( sort $@ | uniq )" > $@
+	@echo '----------------------------'
+	@echo '|  Uploaded Module Into eXist  |'
+	@echo '----------------------------'
+	@cat $@
+	@echo '----------------------------'
+	@touch $(UPLOAD_MODULE_LOGS) 
+
+modules-clean:
+	@rm $(L)/upModules.log
+
+modules-touch:
+	@touch $(SRC_XQM)
 #==========================================================
 #  MODULES
 #  modules is the working directory for xquery modules
@@ -50,18 +119,6 @@ modules-help:
 #
 #
 # #==========================================================
-
-SRC_MODULES := $(shell find modules -name '*.xqm' )
-BUILD_MODULES  := $(patsubst modules/%,$(B)/modules/%,$(SRC_MODULES))
-UPLOAD_MODULE_LOGS  := $(patsubst %.xqm,$(L)/%.log,$(SRC_MODULES))
-
-modules: $(UPLOAD_MODULE_LOGS)
-
-watch-modules:
-	@watch -q $(MAKE) modules
-
-.PHONY:  watch-modules 
-
 # SRC_XQ := $(shell find modules -name '*.xq' )
 # SRC_XQM := $(shell find modules -name '*.xqm' )
 # SRC_XQL := $(shell find modules -name '*.xql' )
@@ -98,16 +155,6 @@ watch-modules:
 #for testing  use: make watch-modules
 
 
-#############################################################
-
-$(B)/modules/%.xqm: modules/%.xqm
-	@echo "##  $*  ##"
-	@[ -d @D ] || mkdir -p $(@D)
-	@echo "SRC: [ $< ]"
-	@xQcompile $< && echo "checked if eXist can compile the module"
-	@cp $< $@ && echo 'copied files into build directory'
-	@echo '-----------------------------------------------------------------'
-
 # Copy over xq xquery modules into build
 # Copy over xq xquery modules into build
 
@@ -121,19 +168,7 @@ $(B)/modules/%.xqm: modules/%.xqm
 # xq compile $<
 # @cp $< $@
 # @echo '-----------------------------------------------------------------'
-
-$(L)/modules/%.log: $(B)/modules/%.xqm
-	@echo "## $@ ##" 
-	@[ -d @D ] || mkdir -p $(@D)
-	@echo 'Upload $(basename $@) to eXist'
-	@xQstore $< > $@
-	@echo "Uploaded eXist path: [ $$(cat $@) ]"
-	@echo 'Check xQuery $(basename $@) permissions set correctly'
-	@xQperm '$<' 'rwxrwxr-x'
-
 # @xQreg 'modules/api/router.xqm' && echo 'registered api module'
-
-
 # $(L)/modules/%.log: $(B)/modules/%.xqm
 # @echo "## $@ ##"
 # @echo "SRC: $<" >/dev/null

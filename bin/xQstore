@@ -1,20 +1,20 @@
 #!/bin/bash +x
 ####################
 # gf  ../../dotfiles/nvim/compiler/xQcompile.vim
-
-verbose=true
-
+if [ $# -ne 1 ]; then
+    echo  $0: usage: requires 1 param [ file ]
+    exit 1
+fi
+verbose=false
 [ ! -e "config" ] &&  exit
 source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
 [ ! -e "../common.properties" ] &&  exit
 source ../common.properties
 [ ! -e "../project.properties" ] &&  exit
 source ../project.properties
-
 # [ ! -d "build" ] && mkdir build
 # [ ! -d "deploy" ] && mkdir deploy
 # [ ! -d ".github" ] && mkdir '.github'
-
 # NOTE! xQuery matches uses regex 
 function getMimeType( ){
 saxonQuery  "doc('file:///${EXIST_HOME}/mime-types.xml')//mime-type[matches(./extensions,'(^\\.${1},)|,\\.${1},|\\.${1}$')]/@name/string()"
@@ -44,6 +44,11 @@ $verbose  && echo "domain [ ${domain} ]"
 absPath=$(readlink -f $1)
 relPath=${absPath#*${domain}/} 
 baseName=$(basename $relPath)
+if [ -z $(echo "$relPath" | cut -d'/' -f1 | grep 'build' ) ]; then
+   echoERR 'must store from build dir'
+   exit 1
+fi
+
 $verbose  && echo "abs-path [ ${absPath} ]"
 $verbose  && echo "rel-path [ ${relPath} ]"
 $verbose  && echo "base name [ ${baseName} ]"
@@ -54,8 +59,10 @@ directory="$(pwd)/build"
 $verbose  && echo "directory [ ${directory} ]"
 pattern=${absPath#*build/}
 $verbose  && echo "pattern [ ${pattern} ]"
-ext=${baseName#*.}
+
+ext=${baseName##*.}
 $verbose  && echo "ext [ ${ext} ]"
+
 if [ $ext == 'svgz' ]; then
  mimeType='application/zip'
 else
@@ -64,7 +71,6 @@ fi
 # TODO! saxon will throw error if mimetype not found
 $verbose  && echo "mimeType [ ${mimeType} ]"
 
-exit 1
 max='1'
 postData="$(
 cat <<EOF

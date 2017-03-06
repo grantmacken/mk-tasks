@@ -75,7 +75,7 @@ $(L)/upTemplates.log: $(UPLOAD_TEMPLATE_LOGS)
 	@echo '----------------------------'
 	@cat $@
 	@echo '----------------------------'
-
+	@touch $(UPLOAD_TEMPLATE_LOGS) 
 # @echo '| Run Test With Prove       |'
 # @echo '----------------------------'
 # @touch $(UPLOAD_TEMPLATE_LOGS) 
