@@ -1,6 +1,10 @@
 #!/bin/bash +x
 ####################
 # gf  ../../dotfiles/nvim/compiler/xQcompile.vim
+if [ $# -ne 1 ]; then
+    echo  $0: usage: requires 1 param [ file ]
+    exit 1
+fi
 
 [ ! -e "config" ] &&  exit
 source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
@@ -10,15 +14,15 @@ source ../common.properties
 source ../project.properties
 
 verbose=false
-
  # params=( file )
 absPath=$(readlink -f $1)
 relPath=$( echo "$absPath" | grep -oP '^.+\Kmodules/.+$' )
 $verbose  && echo "abs-path [ ${absPath} ]"
 $verbose  && echo "rel-path [ ${relPath} ]"
-moduleLoadPath=$( dirname "$absPath" | grep -oP '^.+\Kmodules/.+$' )
 appPath="xmldb:exist:///db/apps/${NAME}/$modulePath"
 $verbose  && echo "app-path: [ ${appPath} ]"
+moduleLoadPath=${appPath}$( dirname "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+$verbose  && echo "Module Load Path: [ ${moduleLoadPath} ]"
 endpoint="https://${NAME}/exist"
 $verbose  && echo "endpoint [ ${endpoint} ]"
 auth="Authorization: Bearer ${SITE_ACCESS_TOKEN}" 
