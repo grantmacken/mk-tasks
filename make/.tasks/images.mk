@@ -11,7 +11,7 @@ where size is what you are aiming for on the web
      [ build ]    images in  build.images dir
      [ upload ]   store into eXist dev server
      [ reload ]   TODO!  trigger live reload
-     [ check ]    with prove run functional tests
+     [ check ]     with prove run functional tests
 =============================================================================
 
  Tools Used 
