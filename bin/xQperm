@@ -1,0 +1,73 @@
+#!/bin/bash +x
+####################
+# gf  ../../dotfiles/nvim/compiler/xQperm.vim
+
+if [ $# -ne 2 ]; then
+    echo  $0: usage: requires 2 params [ file , permissions ]
+    exit 1
+fi
+
+verbose=false
+
+[ ! -e "config" ] &&  exit
+source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+[ ! -e "../common.properties" ] &&  exit
+source ../common.properties
+[ ! -e "../project.properties" ] &&  exit
+source ../project.properties
+
+ # params=( file )
+mode=$2
+absPath=$(readlink -f $1)
+relPath=$( echo "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+$verbose  && echo "abs-path [ ${absPath} ]"
+$verbose  && echo "rel-path [ ${relPath} ]"
+# moduleLoadPath=$( dirname "$absPath" | grep -oP '^.+\Kmodules/.+$' )
+appPath="xmldb:exist:///db/apps/${NAME}/$modulePath"
+$verbose  && echo "app-path: [ ${appPath} ]"
+route="${appPath}${relPath}"
+$verbose  && echo "route: [ ${route} ]"
+endpoint="https://${NAME}/exist"
+$verbose  && echo "endpoint [ ${endpoint} ]"
+auth="Authorization: Bearer ${SITE_ACCESS_TOKEN}" 
+# $verbose  && echo "auth [ ${auth} ]"
+contentType='Content-Type: application/xml'
+$verbose  && echo "content-type[ ${contentType} ]"
+max='1'
+postData="$(
+cat <<EOF
+<query xmlns='http://exist.sourceforge.net/NS/exist'
+ start='1'
+ wrap='no'
+ max='${max}'>
+<text><![CDATA[
+xquery version '3.1';
+if (
+  sm:get-permissions(xs:anyURI('${route}'))//@mode/string() eq '$2'
+  ) then ()
+else (sm:chmod(xs:anyURI('${route}'),'${mode}'))
+]]></text>
+</query>
+EOF
+)"
+# ${moduleLoadPath}
+# CompilerSet errorformat+=%f:%l:%t:\ %
+# '${absPath'
+# echo "${postData}"
+
+echoERR() { printf "%s\n" "$*" >&2; }
+
+result=$(curl -s --http1.1 \
+ -H "$auth" \
+ -H "$contentType" \
+ -d "$postData" \
+ $endpoint)
+
+echo "$result"
+if [ -n "${result}" ]; then 
+ echoERR "${relPath}:1.1:Error: failed to set permissions"
+ exit 1
+else
+  exit 0
+fi
+# TODO try catch error in xQuery expression
