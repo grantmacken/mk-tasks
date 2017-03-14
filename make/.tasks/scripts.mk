@@ -1,4 +1,4 @@
-define imageHelp
+define scriptsHelp
 ===============================================================================
 SCRIPTS : working with scripts
  - js
@@ -6,7 +6,7 @@ SCRIPTS : working with scripts
 Place in resources/scripts  folder 
 
     < src scripts
-     [ optimise ] 
+     [ optimise ]  TODO!
      [ build ]    scripts in  build.scripts dir
      [ upload ]   store into eXist dev server
      [ reload ]   TODO!  trigger live reload
@@ -26,10 +26,14 @@ Place in resources/scripts  folder
  2. watch-styles  ...  watch the directory
   'make scripts' will now be triggered by changes in dir
 endef
+
+scripts-help: export scriptsHelp:=$(scriptsHelp)
+scripts-help:
+	echo "$${scriptsHelp}"
+
 #==========================================================
-#  WWW STATIC ASSETS
-#==========================================================
-# path relative to root
+#  WWW STATIC ASSET
+#
 SRC_SCRIPTS := $(shell find resources/scripts -name '*.js')
 BUILD_SCRIPTS  := $(patsubst %,$(B)/%,$(SRC_SCRIPTS))
 UPLOAD_SCRIPT_LOGS  := $(patsubst %.js,$(L)/%.log,$(SRC_SCRIPTS))
@@ -50,6 +54,9 @@ $(B)/resources/scripts/%.js: resources/scripts/%.js
 	@mkdir -p $(@D)
 	@echo 'TODO! Lint ESLINT'
 	@echo 'TODO! minify with closure compiler '
+	@echo 'TODO gzip files '
+	echo ''https://theartofmachinery.com/2016/06/06/nginx_gzip_static.html 
+	zopfli $< && mv $<.gz  $(dir $@) 
 	@cp $< $@
 	@echo '---------------------------------------------------'
 
@@ -77,7 +84,7 @@ $(L)/upScripts.log: $(UPLOAD_SCRIPT_LOGS)
 # @echo '----------------------------'
 # @echo '| Run Test With Prove       |'
 # @echo '----------------------------'
-# @touch $(UPLOAD_SCRIPT_LOGS) 
+# @touch $(UPLOAD_SCRIPT_LOGS)
 # @prove -v t/scripts.t
 
 scripts-clean:

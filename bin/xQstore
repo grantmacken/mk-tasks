@@ -63,9 +63,9 @@ $verbose  && echo "pattern [ ${pattern} ]"
 ext=${baseName##*.}
 $verbose  && echo "ext [ ${ext} ]"
 
-if [ $ext == 'svgz' ]; then
+if [[ ($ext == 'svgz') || ($ext == 'gz') ]]; then
  mimeType='application/zip'
-else
+else 
   mimeType="$( getMimeType ${ext})"
 fi
 # TODO! saxon will throw error if mimetype not found

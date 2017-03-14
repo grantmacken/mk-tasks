@@ -20,7 +20,6 @@ build:
 properties:
 	@stow -v -t $(UP_TARG_DIR) properties
 
-
 clean:
 	@stow -D -t  $(UP_TARG_DIR)/bin bin
 	@stow -D -t $(UP_TARG_DIR) properties
