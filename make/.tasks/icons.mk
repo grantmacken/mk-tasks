@@ -34,9 +34,6 @@ SOURCE_ICONS := $(shell find resources/icons -name '*.svg')
 BUILD_ICONS  := $(patsubst %,$(B)/%,$(SOURCE_ICONS))
 BUILD_ZIPPED_ICONS  := $(patsubst %,$(B)/%z,$(SOURCE_ICONS))
 UPLOAD_ICON_LOGS  := $(patsubst %.svg,$(L)/%.log,$(SOURCE_ICONS))
-# $(patsubst %.svg,$(L)/%.log,$(SOURCE_ICONS)) 
-#############################################################
-# $(info $(SOURCE_ICONS) )
 #
 # $(BUILD_ICONS) $(BUILD_ZIPPED_ICONS)
 

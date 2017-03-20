@@ -1,18 +1,35 @@
 #Web Project Tasks
 
-Make tasks and shell scripts for working with web projects
+Make tasks and shell scripts for 
+working with web projects under git control
 
-Assume we are in a ~/projects/{REPO_OWNER} dir
-Our web projects will be in domain named directories, like so
-`~/projects/grantmacken/gmack.nz`
+# projects structure
 
-cd into  project dir  `~/projects/grantmacken`  
+```
+echo "$( git config --get user.name )"
+mk  -p ~\projects\$( git config --get user.name )
+```
 
-clone this project and cd into it
+Assume we are in a ~/projects/{GIT_USER} dir
+Our web projects will be in website domain named directories, like so
 
-make build
+`~/projects/{GIT_USER}/{DOMAIN}`
 
-will use stow to
+~/projects/grantmacken/gmack.nz
+~/projects/grantmacken/zie.nz
+
+This project provides helper tools for working with 
+multiple website projects, that uses a web server setup consisting of 
+ - OpenResty  in front of 
+ - eXist  ( a XML data store in a jetty container )
+
+```
+cd  -p ~\projects\$( git config --get user.name )
+git clone git@github.com:grantmacken/mk-tasks.git
+make
+```
+
+make will use stow to
 1. symlink to bin dir one level up
 2. symlink properties files to one level up
 3. symlink node package.json file to one level up
@@ -29,5 +46,10 @@ Stow can be installed through  apt-get, the  ubuntu repo is out of date so use P
 `cpan install Stow`
 
 ## Whats Here
+
+1. 
+
+
+
 
 

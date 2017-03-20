@@ -1,20 +1,15 @@
 
 define modulesHelp
 =========================================================
-MODULES : working with eXist modules
- - extension html
+MODULES : working with eXist modules  - extension xq, xqm
 
     < src modules
-     [ optimise ] 
-     [ build ]    modules in  build.modules dir
+     [ proccess ] compile check if the compile fails it will throw an error
+     [ build ]    move modules into  build dir
      [ upload ]   store modules into eXist dev server
-     [ reload ]   TODO!  trigger live reload
-     [ check ]     with prove run functional tests
+     [ test ]     run unit tests
+     [ check ]    with prove run functional tests
 ==========================================================
-
-Tools Used: 
-
- Notes: path always relative to root
 
 `make modules`
 `make watch-modules`
@@ -78,7 +73,6 @@ $(L)/modules/%.log: $(B)/modules/%.xq
 # @echo 'Check xQuery $(basename $@) permissions set correctly'
 # @xQperm '$<' 'rwxrwxr-x'
 
-
 $(L)/upModules.log: $(UPLOAD_MODULE_LOGS)
 	@$(MAKE) --silent $(UPLOAD_MODULE_LOGS)
 	@echo '' > $@ 
@@ -98,6 +92,7 @@ modules-clean:
 
 modules-touch:
 	@touch $(SRC_XQM)
+	@touch $(SRC_XQ)
 #==========================================================
 #  MODULES
 #  modules is the working directory for xquery modules

@@ -3,19 +3,17 @@ define templateHelp
 TEMPLATES : working with eXist templates
  - extension html
 
-    < src templates
-     [ optimise ] use smartResize 
-     [ build ]    templates in  build.templates dir
-     [ upload ]   store into eXist dev server
-     [ reload ]   TODO!  trigger live reload
-     [ check ]     with prove run functional tests
+  < src templates
+  [ process ]  check well-formed, remove comments, decrease indents
+  [ build ]    mv templates into build dir
+  [ upload ]   store into eXist dev server
+  [ reload ]   TODO!  trigger live reload
+  [ check ]    with prove run functional tests
 ==========================================================
 
 Tools Used: 
   - tidy for checking if well formed xml parse errors
   - tidy for removing comments and decrease indents 
-
- Notes: path always relative to root
 
 `make templates`
 `make watch-templates`
@@ -36,9 +34,6 @@ UPLOAD_TEMPLATE_LOGS  := $(patsubst %.html,$(L)/%.log,$(SRC_TEMPLATES))
 
 templates: $(L)/upTemplates.log
 
-# reload-templates: $(TEMPLATES_STORED_LOG) $(TEMPLATES_RELOADED_LOG)
-#  $(TEMPLATES_STORED_LOG)  $(TEMPLATES_RELOADED_LOG) 
-
 watch-templates:
 	@watch -q $(MAKE) templates
 
@@ -50,7 +45,7 @@ $(B)/templates/%.html: templates/%.html
 	@echo "## $@ ##"
 	@[ -d @D ] || mkdir -p $(@D)
 	@echo 'Check with tidy xml parser: Warnings exit 1 and Errors exit 2 '
-	@tidy -q -xml -utf8 -e  --show-warnings no $@
+	@tidy -q -xml -utf8 -e  --show-warnings no $<
 	@echo 'Use tidy to hide comments an indent space to 1'
 	@tidy -q -xml -utf8 -i --indent-spaces 1 --hide-comments 1  --show-warnings no --output-file $@ $<
 	@echo "Orginal size: [ $$(wc -c $< | cut -d' ' -f1) ]"
@@ -87,25 +82,6 @@ templates-clean:
 
 templates-touch:
 	@touch $(SRC_TEMPLATES)
-
-# @echo "eXist collection_uri: $(join apps/,$(NAME))" 
-# @echo "directory in file system: $(abspath  $(subst /$(subst build/,,$(<)),,$(<)))" 
-# @echo "eXist store pattern: : $(subst build/,,$(<)) "
-# @echo "mime-type: $(call getMimeType,$(suffix $(notdir $(<))))"
-# @echo "stored log path : $(basename $(subst build/,,$(<)))"
-# @echo "stored log dir : $(L)/$(dir $(subst build/,-,$(<)))"
-# @echo "dir : $(shell cut -d '/' -f1 <<< '$*') "
-# @mkdir -p $(L)/$(dir $(subst build/,,$(<)))
-# @xq store-built-resource \
-# '$(join apps/,$(NAME))' \
-# '$(abspath  $(subst /$(subst build/,,$(<)),,$(<)))' \
-# '$(subst build/,,$(<))' \
-# '$(call getMimeType,$(suffix $(notdir $(<))))' \
-# '$(basename $(subst build/,,$(<)))'
-# @echo "make sure we have correct permisions for templates"
-# @$(if $(shell xq permissions $(subst build/,,$(<)) | grep 'rwxrwxr-x'),,\
-# xq chmod '$(subst build/,,$(<))' 'rwxrwxr-x')
-# @echo '-----------------------------------------------------------------'
 
 # $(L)/templates/%.json: $(L)/templates/%.log
 # @echo "## $@ ##"

@@ -49,23 +49,7 @@ package: $(XAR)
 package-clean: 
 	@rm $(XAR)
 
-# use cheerio as simple xml parser
-$(B)/repo.xml: $(P)/repo.xml config
-	@echo "##[ $@ ]##"
-	@echo  "SRC  $< "
-	@node -e "\
- var cheerio = require('cheerio');var fs = require('fs');\
- var x = fs.readFileSync('./$<').toString();\
- var n = cheerio.load(x,{normalizeWhitespace: false,xmlMode: true});\
- n('description').text('$(DESCRIPTION)');\
- n('author').text('$(AUTHOR)');\
- n('website').text('$(WEBSITE)');\
- n('target').text('$(NAME)');\
- n('permissions').attr('user','$(ABBREV)');\
- n('permissions').attr('group','$(ABBREV)');\
- require('fs').writeFileSync('./$@', n.xml() )"
-	@cat $@
-	@echo "------------------------------------------------------------------ "
+
 
 $(B)/expath-pkg.xml: $(P)/expath-pkg.xml config
 	@echo  "MODIFY $@"
@@ -84,12 +68,7 @@ $(B)/expath-pkg.xml: $(P)/expath-pkg.xml config
 	@cat $@
 	@echo "------------------------------------------------------------------ "
 
-# Copy over package root files
-$(B)/%: $(P)/%
-	@mkdir -p $(dir $@)
-	@echo "FILE $@ $<"
-	@cp $< $@
-	@echo "------------------------------------------------------------------ "
+
 
 # Create package with zip
 # but exclude the data dir

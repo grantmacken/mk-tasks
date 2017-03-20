@@ -85,9 +85,9 @@ cat = $(shell if [ -e $(1) ] ;then echo "$$(<$(1))";fi )
 rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
 #~/.config/nvim/words/ns-funcs.thesaurus}}}
 TASKS_DIR := .tasks
-fo := $(TASKS_DIR)/repo.mk
+fo := $(TASKS_DIR)/repo.mk $(TASKS_DIR)/build.mk
 include $(filter-out $(fo) ,$(wildcard $(TASKS_DIR)/*.mk))
-include $(fo)
+# include $(fo)
 
 default: help
 

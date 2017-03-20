@@ -38,7 +38,6 @@ SRC_SCRIPTS := $(shell find resources/scripts -name '*.js')
 BUILD_SCRIPTS  := $(patsubst %,$(B)/%,$(SRC_SCRIPTS))
 UPLOAD_SCRIPT_LOGS  := $(patsubst %.js,$(L)/%.log,$(SRC_SCRIPTS))
 
-# BUILD_SCRIPTS := $(patsubst resources/scripts/%.js, $(L)/resources/scripts/%.json, $(SRC_SCRIPTS))
 #############################################################
 scripts: $(L)/upScripts.log
 
