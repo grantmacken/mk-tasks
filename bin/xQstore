@@ -94,7 +94,6 @@ auth="Authorization: Bearer ${SITE_ACCESS_TOKEN}"
 contentType='Content-Type: application/xml'
 $verbose  && echo "content-type[ ${contentType} ]"
 
-
 result=$(curl -s --http1.1 \
  -H "$auth" \
  -H "$contentType" \
