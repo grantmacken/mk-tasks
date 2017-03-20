@@ -1,0 +1,79 @@
+#!/bin/bash +x
+####################
+# if [ $# -ne 1 ]; then
+#     echo  $0: usage: requires 1 param [ file ]
+#     exit 1
+# fi
+verbose=false
+[ ! -e "config" ] &&  exit
+source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+[ ! -e "../common.properties" ] &&  exit
+source ../common.properties
+[ ! -e "../project.properties" ] &&  exit
+source ../project.properties
+
+function saxonQuery(){
+java -cp $SAXON \
+  net.sf.saxon.Query \
+  \!method=text \
+  -qversion:3.0 \
+  -qs:"${1}"
+}
+
+function echoERR() {
+  printf "%s\n" "$*" >&2;
+}
+
+max='1'
+postData="$(
+cat <<EOF
+<query xmlns='http://exist.sourceforge.net/NS/exist'
+ start='1'
+ wrap='no'
+ max='99'>
+<text><![CDATA[
+xquery version '3.1';
+declare namespace output = 'http://www.w3.org/2010/xslt-xquery-serialization';
+declare option output:method 'text';
+declare option output:media-type 'text/plain';
+declare option output:item-separator '&#10;';
+declare option output:encoding 'UTF-8';
+(
+if(not(sm:user-exists('${GIT_USER}'))) then (sm:create-account('${GIT_USER}','${GITHUB_ACCESS_TOKEN}','dba')) else (),
+if(sm:user-exists('${GIT_USER}')) then ('${GIT_USER} account enabled: ' || sm:is-account-enabled('${GIT_USER}') || '&#10;') else (),
+if(sm:user-exists('${GIT_USER}')) then ('${GIT_USER} is dba: ' || sm:is-dba('${GIT_USER}') || '&#10;') else (),
+if(sm:user-exists('${GIT_USER}')) then ('${GIT_USER} primary group: ' || sm:get-user-primary-group('${GIT_USER}') || '&#10;') else (),
+if(sm:user-exists('${GIT_USER}')) then ('${GIT_USER} groups: ' || string-join( sm:get-user-groups('${GIT_USER}'), ', ' )
+|| '&#10;') else (),
+'admin user groups:  ' ||  string-join( sm:get-user-groups('admin'), ', ' ) || '&#10;' ,
+'dba group members:  ' ||  string-join( sm:get-group-members('dba'), ', ' ) || '&#10;'
+)
+]]></text>
+</query>
+EOF
+)"
+$verbose  && echo "${postData}"
+
+endpoint="http://localhost:8080/exist/rest/db"
+# $verbose  && echo "endpoint [ ${endpoint} ]"
+auth="admin:${GITHUB_ACCESS_TOKEN}"
+# $verbose  && echo "auth [ ${auth} ]"
+contentType='Content-Type: application/xml'
+
+$verbose  && echo "content-type[ ${contentType} ]"
+$verbose  && echo "auth[ ${auth} ]"
+$verbose  && echo "content-type[ ${postData} ]"
+
+curl -s \
+ -u "$auth" \
+ -H "$contentType" \
+ -d "$postData" \
+ $endpoint
+
+
+# 'groups: ' ||  string-join( sm:list-groups(), ', ' ) || '&#10;' ,
+# 'users: ' ||  string-join( sm:list-users(), ', ' ) || '&#10;',
+
+#  'users: ' || \$users || \$nl 
+# let \$groups := sm:list-groups()
+#  'groups: ' || \$groups || \$nl \

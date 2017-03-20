@@ -1,0 +1,88 @@
+#!/bin/bash +x
+####################
+# if [ $# -ne 1 ]; then
+#     echo  $0: usage: requires 1 param [ file ]
+#     exit 1
+# fi
+verbose=true
+[ ! -e "config" ] &&  exit
+source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+[ ! -e "../common.properties" ] &&  exit
+source ../common.properties
+[ ! -e "../project.properties" ] &&  exit
+source ../project.properties
+
+# VERSION=$(echo "${SEMVER}" | sed 's/v//')
+
+
+function saxonQuery(){
+java -cp $SAXON \
+  net.sf.saxon.Query \
+  \!method=text \
+  -qversion:3.0 \
+  -qs:"${1}"
+}
+
+function echoERR() {
+  printf "%s\n" "$*" >&2;
+}
+
+latestRelease=$(curl -s https://api.github.com/repos/${GIT_REPO_FULL_NAME}/releases/latest )
+# $verbose  && echo "${latestRelease}"
+
+downloadURL=$( echo "$latestRelease" | jq -r '.assets[] | .browser_download_url' )
+downloadFile='file:///home/gmack/projects/grantmacken/gmack.nz/deploy/gmack-0.9.0.xar'
+
+version=$( echo "$latestRelease" | jq -r '.tag_name' | sed 's/v//' )
+install="'deploy ${GIT_REPO_NAME} : ',repo:install-and-deploy('${GIT_REPO_NAME}','${version}','${downloadURL}'),'&#10;',"
+install2="'deploy ${GIT_REPO_NAME} : ',repo:install-and-deploy('${GIT_REPO_NAME}','${downloadFile}'),'&#10;',"
+remove="'remove ${GIT_REPO_NAME} : ', repo:remove('${GIT_REPO_NAME}'),'&#10;',"
+$verbose  && echo "download url[ ${downloadURL} ]"
+$verbose  && echo "repo name [ ${GIT_REPO_NAME} ]"
+$verbose  && echo "version [ ${version} ]"
+
+max='1'
+postData="$(
+cat <<EOF
+<query xmlns='http://exist.sourceforge.net/NS/exist'
+ start='1'
+ wrap='no'
+ max='99'>
+<text><![CDATA[
+xquery version '3.1';
+declare namespace output = 'http://www.w3.org/2010/xslt-xquery-serialization';
+declare option output:method 'text';
+declare option output:media-type 'text/plain';
+declare option output:item-separator '&#10;';
+declare option output:encoding 'UTF-8';
+(
+'this repo download url: ${downloadURL} &#10;' ,
+'this repo name : ${GIT_REPO_NAME} &#10;' ,
+'repo root: '  || repo:get-root() || '&#10;' ,
+${install2}
+'repo list:&#10;=========&#10;'  || \
+  string-join(repo:list() , '&#10;' ) || '&#10;'
+)
+]]></text>
+</query>
+EOF
+)"
+$verbose  && echo "${postData}"
+endpoint="http://localhost:8080/exist/rest/db"
+# $verbose  && echo "endpoint [ ${endpoint} ]"
+auth="${GIT_USER}:${GITHUB_ACCESS_TOKEN}"
+# $verbose  && echo "auth [ ${auth} ]"
+contentType='Content-Type: application/xml'
+
+# $verbose  && echo "content-type[ ${contentType} ]"
+# $verbose  && echo "auth[ ${auth} ]"
+# $verbose  && echo "content-type[ ${postData} ]"
+
+curl -s \
+ -u "$auth" \
+ -H "$contentType" \
+ -d "$postData" \
+ $endpoint
+
+# 'remove ${GIT_REPO_NAME} : ', repo:remove('${GIT_REPO_NAME}'),'&#10;',
+# 'deploy ${GIT_REPO_NAME} : ', repo:install-and-deploy('${GIT_REPO_NAME}',${version},'${downloadURL}'), '&#10;',
