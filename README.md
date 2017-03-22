@@ -1,13 +1,14 @@
-#Web Project Tasks
+#[Web Project Tasks](notes/index.md)
 
-Make tasks and shell scripts for 
-working with web projects under git control
+Make tasks and shell scripts for working with web projects under git control
+
+For [help](notes/index.md) on [using the tasks](notes/index.md) please refer to 
+the [notes](notes/index.md)
 
 This project provides helper tools for working with 
 multiple website projects, that uses a web server setup consisting of 
  - OpenResty  in front of 
  - eXist  ( a XML data store in a jetty container )
-
 
 ```
 cd  -p ~\projects\$( git config --get user.name )

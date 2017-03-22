@@ -20,8 +20,8 @@ function omCreateBranch(){
 [ -n "$(git status -s --porcelain --untracked-file=no)" ]  && \
   git add . ; git commit -am 'prep for first run'
 [ -z "${BRANCH_SELECTED}" ] && return 1
-echo "TASK! create local branch: *${BRANCH_SELECTED}*"
-echo "CHECK! if *${BRANCH_SELECTED}* does not exist"
+$verbose && echo "TASK! create local branch: *${BRANCH_SELECTED}*"
+$verbose && echo "CHECK! if *${BRANCH_SELECTED}* does not exist"
 chk=$( git branch | grep -oP "${BRANCH_SELECTED}" )
 if [ -z  "${chk}" ] ;  then
   echo "YEP! *${BRANCH_SELECTED}* does *not* exist OK!"
@@ -31,7 +31,7 @@ if [ -z  "${chk}" ] ;  then
   chk=$( echo "${doTask}" | grep -oP 'set up to track remote branch' )
   if [ -n "${chk}" ] ; then
 	  echo "INFO!: - ${doTask}"
-	  local msg=$(                                                 
+	  local msg=$(
 	  git reflog | \
 	  head -1 |
 	  grep -oP 'checkout:\s.+' )
@@ -67,10 +67,10 @@ echo "INFO! - *ISSUE_TITLE* [ ${ISSUE_TITLE} ]"
 omNewIssueLabel 'LABEL_SELECTED' || return 1
 omNewIssueMilestone 'MILESTONE_NUMBER'|| return 1
 #echo "INFO! - *MILESTONE_NUMBER* [ $MILESTONE_NUMBER ]"
-inputPrompt 'ISSUE_SUMMARY' 'enter short one line'
-echo "INFO!  *ISSUE_SUMMARY*: [ ${ISSUE_SUMMARY} ]"
-inputPrompt 'ISSUE_TASK' 'enter first '
-echo "INFO!  *ISSUE_TASK*: [ ${ISSUE_TASK} ]"
+# inputPrompt 'ISSUE_SUMMARY' 'enter short one line'
+# echo "INFO!  *ISSUE_SUMMARY*: [ ${ISSUE_SUMMARY} ]"
+# inputPrompt 'ISSUE_TASK' 'enter first '
+# echo "INFO!  *ISSUE_TASK*: [ ${ISSUE_TASK} ]"
 ## from choices create ${ISSUE_FILE}
 cat << EOF | tee ${ISSUE_FILE}
 <!--
@@ -78,10 +78,11 @@ ISSUE_TITLE="${ISSUE_TITLE}"
 ISSUE_LABEL="${LABEL_SELECTED}"
 ISSUE_MILESTONE="${MILESTONE_NUMBER}"
 -->
-${ISSUE_SUMMARY}
+${ISSUE_TITLE}
 
-- [ ] ${ISSUE_TASK}
-- [ ] adjust readme re. issue
+- [ ] dummy task 1
+- [ ] dummy task 2
+
 EOF
 
 }

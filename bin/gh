@@ -1,5 +1,5 @@
- #!/usr/bin/env bash
-###########################################
+#!/bin/bash +x
+###############
 [ ! -e "config" ] &&  exit
 [ ! -e "../common.properties" ] &&  exit
 [ ! -e "../project.properties" ] &&  exit
@@ -12,12 +12,46 @@ fi
 source "../common.properties"
 [ ! -d "${BIN_DIR}/gh-includes" ]  &&  exit
 # setup some common dirs
-[ ! -d "$GITHUB_DIR" ] &&  mkdir -p $GITHUB_DIR/etags $GITHUB_DIR/headers
-[ ! -d "$GITHUB_DIR/issue" ] &&  mkdir -p $GITHUB_DIR/issue
-[ ! -d "$TEMP_DIR" ] &&  mkdir $TEMP_DIR
-[ ! -d "$LOG_DIR" ] &&  mkdir $LOG_DIR
+[ ! -d "${G}" ] &&  mkdir -p ${G}/etags ${G}/headers
+[ ! -d "${G}/issue" ] &&  mkdir -p ${G}/issue
+[ ! -d "${T}" ] &&  mkdir ${T}
+[ ! -d "${L}" ] &&  mkdir ${L}
 source "../project.properties"
+# constants
+ISSUE_FILE=issue.md
+JSN_REPO="${G}/repo.json"
+#LISTS
+JSN_LABELS="${G}/labels.json"
+JSN_MILESTONES="${G}/milestones.json"
+JSN_TAGS="${G}/tags.json"
+# ISSUES and BRANCHES
+JSN_ISSUES="${G}/issues.json"
+JSN_ISSUE="${G}/issue.json"
+JSN_BRANCHES="${G}/branches.json"                         
+JSN_BRANCH="${G}/branch.json"
+# PULL REQUEST
+JSN_PULLS="${G}/pulls.json"
+JSN_PULL_REQUEST="${G}/pull-request.json"
+JSN_PR_COMMENTS="${G}/pr-comments.json"
+JSN_PR_COMMENT="${G}/pr-comment.json"
+JSN_PR_COMMITS="${G}/pr-commits.json"
+JSN_PR_STATUSES="${G}/pr-statuses.json"
+JSN_PR_STATUS="${G}/pr-status.json"
+JSN_PR_COMBINED_STATUS="${G}/pr-combined-status.json"
+JSN_MERGE="${G}/merge.json"
+#RELEASES
+JSN_RELEASES="${G}/releases.json"
+JSN_RELEASE="${G}/release.json"
+JSN_LATEST_RELEASE="${G}/latest-release.json"
+JSN_ASSET_UPLOADED="${G}/asset_uploaded.json"
+#DEPLOYMENTS
+JSN_DEPLOYMENTS="${G}/deployments.json"
+JSN_DEPLOYMENT="${G}/deployment.json"
+JSN_DEPLOYMENT_STATUSES="${G}/deployment_statuses.json"
+JSN_DEPLOYMENT_STATUS="${G}/deployment_status.json"
+
 imports="${BIN_DIR}/gh-includes"
+# on-branch on-master release-strategy input pull-request
 files=(repo usage parse on-branch on-master release-strategy input pull-request)
 if [ -d ${imports} ];then
   for f in "${files[@]}"
@@ -93,43 +127,36 @@ REQUEST=$1
 ## then create the request from these
 #echo "INFO! - *ARGS_COUNT* [ ${ARGS_COUNT} ]"
 if [ $ARGS_COUNT -eq 1 ]; then
-  if [ -e "${BIN_DIR}/request/${REQUEST}.sh" ] ; then
-	chmod +x "${BIN_DIR}/request/${REQUEST}.sh"
-	#payload=$( ${BIN_DIR}/payload/${REQUEST}.sh )
-  fi
   ARGS=()
 else
   shift
   ARGS=("$@")
-  $verbose && echo "INFO! - *ARGS* [ ${ARGS[@]} ]"
-  # when we want to interpolate useing a heredoc
-  if [ -e "${BIN_DIR}/request/${REQUEST}.sh" ] ; then
-	chmod +x "${BIN_DIR}/request/${REQUEST}.sh"
-	#payload=$( ${BIN_DIR}/payload/${REQUEST}.sh  "${ARGS}")
-  fi
 fi
 
 params=()
 jsnREPO=
 thenDo=
 
-
 if [ "$REQUEST"  = 'get-repo' ]
 then
   echo "INFO! get the repo before any other calls"
+  REPO_URL="${REPO_BASE_URL}/repos/${GIT_REPO_FULL_NAME}"
 else
- [ -e ${JSN_REPO} ]  || {
-  echo "FAILURE! no file ${JSN_REPO}"
+ [ -e ${G}/repo.json ]  || {
+  echo "FAILURE! no file ${JSON_REPO}"
   exit 1
   } && {
   parseRepo || exit 1
   }
 fi
+# gf: ../../bin/gh-includes/parse.sh
+# should have repo vars
+$verbose && echo "repo url: [ $REPO_URL ]"
 
-
-[ -n "${GIT_REPO_FULL_NAME}" ]  || exit 1
-API_REPO="${REPO_BASE_URL}/repos/${GIT_REPO_FULL_NAME}"
+# REPO_URL="${REPO_BASE_URL}/repos/${GIT_REPO_FULL_NAME}"
 DO="$(echo "$REQUEST" | sed -r 's/-(.+)//g' )"
+
+$verbose && echo "do: [ $DO ]"
 #COLLECTION_NAME=
 #GET_COLLECTION=
 #if [ "$DO" = 'create' ] || [ "$DO" = 'delete' ] ; then
@@ -139,17 +166,14 @@ DO="$(echo "$REQUEST" | sed -r 's/-(.+)//g' )"
 #  echo "TASK! *AFTER REQUEST - GET_COLLECTION* : [ $GET_COLLECTION ]"
 #fi
 
-#echo '.github/merge.json' | sed s/\.json/\.etag/
-# echo '.github/merge.json' | sed s%^\.%\./\.%
-
 case "$REQUEST" in
 #LIST-START#
   get-repo)
   params=( )
   method='GET'
-  requestURL="${API_REPO}"
+  requestURL="${REPO_URL}"
   outFile="${JSN_REPO}"
-  # thenDo='get-repo-lists'
+  thenDo='get-repo-lists'
   ;;
   info-repo)
   params=( )
@@ -223,7 +247,6 @@ case "$REQUEST" in
   exit
   ;;
 # LABELS
-# https://developer.github.com/v3/issues/labels/
   get-labels)
   params=( )
   method='GET'
@@ -240,8 +263,8 @@ case "$REQUEST" in
   params=(name color)
   method='POST'
   requestURL="${REPO_LABELS_URL}"
-  [ ! -d "$GITHUB_DIR/label" ] &&  mkdir -p $GITHUB_DIR/label
-  outFile="$GITHUB_DIR/label/${1}.json"
+  [ ! -d "${G}/label" ] &&  mkdir -p ${G}/label
+  outFile="${G}/label/${1}.json"
   jsn="{\"name\":\"${1}\",\"color\":\"${2}\"}"
   expectResponse=201
   ;;
@@ -256,10 +279,8 @@ case "$REQUEST" in
   list-label-names)
   params=( )
   gh get-labels
-  jsnLABELS=$(<${JSN_LABELS})
-  #echo "${jsnMILESTONES}" | jq -r -c '.[] | [ .title ] '
-  #echo "${jsnMILESTONES}" | R -p  'identity'
-  echo "${jsnLABELS}" | jq -r '["name"],(.[] | [.name]) | @sh'
+  echo "$(<${JSN_LABELS})" | jq -r '["name"],(.[] | [.name]) | @sh'
+  # echo "$(<${JSN_LABELS})" | jq -r '.[] | .name | @sh'
   exit
   ;;
   parse-labels)
@@ -283,7 +304,6 @@ case "$REQUEST" in
   exit
   ;;
 # MILESTONES
-# https://developer.github.com/v3/issues/milestones/
   default-milestones)
   params=( )
   for item in "${RELEASE_MILESTONES[@]}";
@@ -317,7 +337,8 @@ case "$REQUEST" in
   params=( )
   #gh get-labels
   jsnMILESTONES=$(<${JSN_MILESTONES})
-  echo "${jsnMILESTONES}" | jq -r -c '.[] | [ .title ] '
+  echo "${jsnMILESTONES}" | jq -r -c '.[] | [ .title ] | @sh '
+  exit
   ;;
   select-milestone)
   params=( )
@@ -344,8 +365,6 @@ case "$REQUEST" in
   ;;
   new-issue-md)
   params=( )
-  #parseFetchedIssues
-  # omSetIssuesForBranches
   omNewIssueMD
   exit
   ;;
@@ -366,7 +385,8 @@ case "$REQUEST" in
   ISSUE_NUMBER="$(echo "$(<${JSN_ISSUE})" | jq '.number')"
   parseIssueMD
   omSetJsonFromIssueMD 'jsn'
-  echo "${jsn}"
+  $verbose && echo "${jsn}" | jq '.'
+  $verbose && echo "URL [ ${REPO_ISSUES_URL}/${ISSUE_NUMBER} ] " 
   jsn=$(echo "${jsn}")
   method='PATCH'
   requestURL="${REPO_ISSUES_URL}/${ISSUE_NUMBER}"
@@ -377,7 +397,6 @@ case "$REQUEST" in
   params=( )
   labels="$( echo "${ISSUE_BRANCH_TYPES[@]}" | tr ' ' ',' )"
 ## note param is label not labels
-## https://developer.github.com/v3/issues/
 ## if issues list gets to big use more filters e.g. state and since o
   URL="${REPO_ISSUES_URL}?state=open&label=${labels}"
   method='GET'
@@ -410,7 +429,7 @@ case "$REQUEST" in
   requestURL="${baseURL}/${1}"
   expectResponse=204
   outFile=
-  exi
+  exit
   ;;
   get-current-issue)
   params=( )
@@ -437,7 +456,7 @@ case "$REQUEST" in
   exit
   ;;
   parse-issue-md)
-  params=( ) s
+  params=( )
   parseIssueMD
   exit
   ;;
@@ -446,11 +465,11 @@ case "$REQUEST" in
   parseFetchedIssue
   cat << EOF | tee ${ISSUE_FILE}
 <!--
-ISSUE_TITLE="${FETCHED_ISSUE_TITLE}"
-ISSUE_LABEL="${FETCHED_ISSUE_LABEL}"
-ISSUE_MILESTONE="${FETCHED_ISSUE_MILESTONE_TITLE}"
+ISSUE_TITLE="${ISSUE_TITLE}"
+ISSUE_LABEL="${ISSUE_LABEL}"
+ISSUE_MILESTONE="${ISSUE_MILESTONE_TITLE}"
 -->
-${FETCHED_ISSUE_BODY}
+${ISSUE_BODY}
 EOF
   exit
   ;;
@@ -501,9 +520,11 @@ EOF
   requestURL="${REPO_PULLS_URL}"
   outFile="${JSN_PULL_REQUEST}"
   prPriorPullRequest || exit
+  parseFetchedIssue
   issueNumber=${FETCHED_ISSUE_NUMBER}
   issueHead=${CURRENT_BRANCH}
   jsn="{\"issue\":\"${issueNumber}\",\"head\":\"${issueHead}\",\"base\":\"master\"}"
+  $verbose && echo ${jsn} | jq '.'
   expectResponse=201
   ;;
   get-pull-request)
@@ -516,7 +537,7 @@ EOF
   get-current-pull-request)
   params=( )
   method='GET'
-  parseFetchedIssue > /dev/null
+  parseFetchedIssue 
   baseURL="${REPO_PULLS_URL}"
   requestURL="${baseURL}/${FETCHED_ISSUE_NUMBER}"
   outFile="${JSN_PULL_REQUEST}"
@@ -674,7 +695,7 @@ EOF
   ;;
   create-pr-shipit-comment)
   params=( )
-  parsePullRequest >  /dev/null
+  parsePullRequest
   echo "INFO! *PR_COMMENTS_URL*: [${PR_COMMENTS_URL}]"
   txt=":shipit:  LGTM"
   jsn="{\"body\":\"${txt}\"}"
@@ -699,10 +720,7 @@ EOF
 #pending if there are no statuses or a context is pending
 #success if the latest status for all contexts is success
   params=( )
-  parsePullRequest > /dev/null
-  PR_COMBINED_STATUS_URL="${REPO_COMMITS_URL}/${PR_HEAD_SHA}/status"
-  echo "INFO! - *PR_COMBINED_STATUS_URL*: [ ${PR_COMBINED_STATUS_URL} ]"
-  #echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
+  parsePullRequest
   method='GET'
   requestURL="${PR_COMBINED_STATUS_URL}"
   outFile="${JSN_PR_COMBINED_STATUS}"
@@ -718,16 +736,16 @@ EOF
 #involving those commits.
   get-pr-statuses)
   params=( )
-  parsePullRequest  > /dev/null
-  echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
+  parsePullRequest
+  @verbose && echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
   method='GET'
   requestURL="${PR_STATUSES_URL}"
   outFile="${JSN_PR_STATUSES}"
   ;;
   create-pr-default-success-status)
   params=( )
-  parsePullRequest  > /dev/null
-  echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
+  parsePullRequest
+  $verbose && echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
   method='POST'
   requestURL="${PR_STATUSES_URL}"
   outFile="${JSN_PR_STATUS}"
@@ -752,8 +770,6 @@ EOF
   exit
   ;;
 # TAGS
-# https://developer.github.com/v3/repos/#list-tags
-# https://developer.github.com/v3/git/refs/
 # tag is create when we merge a pull release
 #o should be able to delete tag by deleleting release
   get-tags)
@@ -782,8 +798,6 @@ EOF
   outFile=
   ;;
 #RELEASES
-# https://developer.github.com/changes/2013-09-25-releases-api/
-# https://developer.github.com/v3/repos/releases
   get-release)
   params=( tagname )
   method='GET'
@@ -820,11 +834,14 @@ EOF
   exit
   ;;
   create-release)
-  params=( tag_name name body)
+  params=( tag_name name body )
+  $verbose && echo "tag name: [ ${1} ]"
+  $verbose && echo "name: [ ${2} ]"
+  $verbose && echo "body: [ ${3} ]"
   method='POST'
   requestURL="${REPO_RELEASES_URL}"
   outFile="${JSN_RELEASE}"
-  jsn="{\"tag_name\":\"${1}\",\"target_commitish\":\"master\",\"name\":\"${2}\",\"body\":\"${3}\",\"draft\":false,\"prerelease\":false}"
+  jsn="{\"tag_name\":\"${1}\",\"target_commitish\":\"master\",\"name\":\"${2}\",\"body\":${3},\"draft\":false,\"prerelease\":false}"
   echo "${jsn}" | jq '.'
   expectResponse=201
   ;;
@@ -880,7 +897,6 @@ EOF
   outFile=
   ;;
 #DEPLOYMENTS
-#https://developer.github.com/v3/repos/deployments
   get-deployments)
   params=( )
   method='GET'
@@ -932,8 +948,6 @@ if [[ "${#params[@]}" -ne "${#ARGS[@]}" ]] ; then
   fi
   exit 1
 fi
-
-# https://api.github.com/repos/grantmacken/gmack.nz/releases/assets/417550
 
 case "$method" in
   GET)

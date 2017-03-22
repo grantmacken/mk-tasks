@@ -6,23 +6,24 @@
 #
 # when ISSUE.md is saved
 # send patch to github
-#
 
 function branchSyncIssue(){
-  parseBranchName  > /dev/null
-  parseIssueMD  > /dev/null 
-  parseFetchedIssue > /dev/null
-  if ! branchIssueInSynChecks ; then
-    gh patch-issue && {
-    notify-send "Upload Issue Patch to GITHUB" -t 200
-    } ||  return 1
-  fi
+  parseBranchName
+  parseIssueMD 
+  parseFetchedIssue
+  branchIssueInSynChecks || branchPatchIssue
+}
+
+function branchPatchIssue(){
+  $verbose && echo "dif found so patch issue ... "
+  gh patch-issue
+  notify-send "Upload Issue Patch to GITHUB" -t 200
 }
 
 function branchIssueInSynChecks(){
-echo "CHECK! is fetched issue title same as current issue title"
+$verbose && echo "CHECK! is fetched issue title same as current issue title"
 if [[ "${FETCHED_ISSUE_TITLE}" = "${ISSUE_TITLE}" ]] ; then
-  echo "YEP! fetched issue title same as current issue title"
+ $verbose &&  echo "YEP! fetched issue title same as current issue title"
   # check 2
   local md5FetchedIssueBody=$(
   echo "$FETCHED_ISSUE_BODY" | \
@@ -36,18 +37,18 @@ if [[ "${FETCHED_ISSUE_TITLE}" = "${ISSUE_TITLE}" ]] ; then
   sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' | \
   md5sum
   )
-  # echo "${md5FetchedIssueBody}"
-  # echo "${md5MDIssueBody}"
-  echo "CHECK! is fetched issue body same as current issue body"
+  $verbose &&  echo "md5 Fetch Issue Body [ ${md5FetchedIssueBody} ]"
+  $verbose &&  echo " md5 File Issue Body [ ${md5MDIssueBody} ]"
+ $verbose &&  echo "CHECK! is fetched issue body same as current issue body"
   if [[ "${md5FetchedIssueBody}" = "${md5MDIssueBody}" ]] ; then
-     echo "YEP! fetched issue body same as current issue body"
+ $verbose && echo "YEP! fetched issue body same as current issue body"
      return 0
   else
-    echo "NOPE! fetched issue body *not* the same as current issue body"
+ $verbose && echo "NOPE! fetched issue body *not* the same as current issue body"
     return 1
  fi
 else
-  echo "NOPE! fetched issue title *not* the same as current issue title"
+ $verbose && echo "NOPE! fetched issue title *not* the same as current issue title"
   return 1
 fi
 }

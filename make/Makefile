@@ -1,21 +1,8 @@
+SHELL=/bin/bash
 include config
 include ../common.properties
-SHELL=/bin/bash
+include ../mk-project.properties
 export PATH := $(abspath ../bin):$(abspath ../node_modules/.bin):$(PATH)
-# dir shortcuts
-T := .temp
-G := .github
-L := .logs
-B := build
-D := deploy
-P := pkg
-
-#common paths 
-# EXIST_HOME := /usr/local/eXist
-# EXIST_DATA_DIR := webapp/WEB-INF/data
-# WEBDAV := ~/eXist
-# SAXON := $(wildcard $(EXIST_HOME)/lib/endorsed/Saxon*.jar )
-# OPENRESTY_HOME := /usr/local/openresty
 
 # keep intermediate files
 # http://stackoverflow.com/questions/3046117/gnu-makefile-multiple-outputs-from-single-rule-preventing-intermediate-files
@@ -23,10 +10,13 @@ P := pkg
 
 #{{{
 # Make sure we have the following apps installed:
-APP_LIST = git curl node expect tidy
+APP_LIST = git curl node expect tidy scour
 assert-command-present = $(if $(shell which $1),,$(error '$1' missing and needed for this build))
 $(foreach src,$(APP_LIST),$(call assert-command-present,$(src)))
 
+
+# HOST_REMOTE := $(shell  dig +short $(GIT_REPO_NAME) )
+# CURRENT_BRANCH := $(shell git symbolic-ref HEAD 2> /dev/null | sed -e 's/refs\/heads\///')
 # live reload
 # check if livereload active
 PID_TINY_LR := tiny-lr.pid
@@ -39,10 +29,17 @@ endif
 # VERSION = $(shell echo $$(gh latest-tag | sed 's/v//'))
 VERSION != echo "$(SEMVER)" | sed 's/v//'
 XAR != echo "$(D)/$(ABBREV)-$(VERSION).xar"
-
-# REPO 
-REPO_BASE_URL := https://api.github.com
-
+# GIT_USER := $(shell git config --get user.name )
+# GIT_EMAIL := $(shell git config --get user.email )
+# # REPO 
+# REPO_BASE_URL := https://api.github.com
+# GIT_REMOTE_ORIGIN_URl := $(shell git config --get remote.origin.url )
+# GIT_REPO_FULL_NAME := $(shell echo $(GIT_REMOTE_ORIGIN_URl) | sed -e 's/git@github.com://g' | sed -e 's/\.git//g' )
+# GIT_REPO_NAME := $(shell  echo $(GIT_REPO_FULL_NAME) |cut -d/ -f2 )
+# GIT_REPO_OWNER_LOGIN := $(shell  echo $(GIT_REPO_FULL_NAME) |cut -d/ -f1 )
+# GITHUB_ACCESS_TOKEN := $(shell  <../.github-access-token)
+# SITE_ACCESS_TOKEN := $(shell <../.site-access-token)
+# WEBSITE := https://$(GIT_REPO_NAME)
 ifeq ($(TRAVIS_BRANCH),)
  CURRENT_BRANCH := $(shell git symbolic-ref HEAD 2> /dev/null | sed -e 's/refs\/heads\///' )
 else
@@ -65,20 +62,12 @@ OWNER := $(shell echo  "$(REPO_SLUG)" |cut -d/ -f1)
 REPO := $(shell echo  "$(REPO_SLUG)" |cut -d/ -f2)
 API_REPO := $(REPO_BASE_URL)/repos/$(REPO_SLUG)
 #derived vars
-WEBSITE := https://$(REPO)
 CURRENT_DATE  != date "+%Y-%m-%d"
 CURRENT_DATE_TIME != date "+%Y-%m-%dT%H:%M:%S"
 
 # common functions
 empty :=
 space := $(empty) $(empty)
-
-getMimeType = $(shell java -cp $(SAXON) \
- net.sf.saxon.Query \
- \!method=text \
- -qversion:3.0  \
- -qs:"doc('file:///$(EXIST_HOME)/mime-types.xml')//mime-type[matches(./extensions,'\$(1),|\$(1)$$')]/@name/string()"\
-)
 
 cat = $(shell if [ -e $(1) ] ;then echo "$$(<$(1))";fi )
 
@@ -87,7 +76,7 @@ rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst 
 TASKS_DIR := .tasks
 fo := $(TASKS_DIR)/repo.mk $(TASKS_DIR)/build.mk
 include $(filter-out $(fo) ,$(wildcard $(TASKS_DIR)/*.mk))
-# include $(fo)
+include $(TASKS_DIR)/repo.mk
 
 default: help
 

@@ -1,4 +1,39 @@
+
+define repoHelp
+=========================================================
+CURRENT BRANCH: $(CURRENT_BRANCH)
+
+REPO TASKS:
+
+make issue
+
+---------------------------------------------------------
+TASKS : make tasks that can be invoked in this repo 
+
+ - make issue
+
+ ISSUE WITH TASK LIST
+  on master:
+  - make issue: ...  creates a new issue on github
+  - make branch ...  creates a branch with branch name based on issue 
+  on branch
+  - make issue: ...  patch issue
+
+ PULL REQUEST PHASE
+  - pull-request
+  - pr-shipit ... creates a Looks Good To Me shiptit comment
+  - pr-status ... creates a All Good status
+  - pr-merge
+
+==========================================================
+endef
+
+repo-help: export repoHelp:=$(repoHelp)
+repo-help:
+	@echo "$${repoHelp}"
+
 # github repo TASKS
+#
 ###############################################################################
 #  make issue 
 # ISSUE WITH TASK LIST
@@ -12,7 +47,6 @@
 #
 # PULL REQUEST PHASE
 #  - pull-request
-#  - gh create-pr-shipit-comment
 #  - pr-shipit ... creates a Looks Good To Me shiptit comment
 #  - pr-status ... creates a All Good status  
 #  - pr-merge
@@ -29,6 +63,7 @@ ifeq ($(CURRENT_BRANCH),master)
 else
  isMaster = $(empty)
 endif
+
 #==========================================================
 ifneq ($(wildcard $(JSN_ISSUE)),)
  ISSUE_NUMBER !=  echo "$$(<$(JSN_ISSUE))" | jq -r -c '.number'
@@ -44,8 +79,7 @@ ifneq ($(wildcard $(JSN_PULL_REQUEST)),)
  PR_MILESTONE_DESCRIPTION != echo "$$(<$(JSN_PULL_REQUEST))" | jq -r -c '.milestone | .description'    
  PR_HEAD_REFERENCE  != echo $$(<$(JSN_PULL_REQUEST)) | jq '.head | .ref'
  PR_BODY !=  echo $$(<$(JSN_PULL_REQUEST)) | jq '.body | @sh'
-endif           
-
+endif
 
 #############################################################
 
@@ -55,13 +89,17 @@ chkJson = $(shell [ -e $1 ] ||\
  if [ -e $(G)/etags/$(notdir $(basename $1)).etag ];\
  then rm $(G)/etags/$(notdir $(basename $1)).etag ; fi )
 
-repo: $(G)/repo.json
+repo: 
+	$(MAKE) $(G)/repo.json
 
-# TODO! incorp  gh default-labels and default milestones
-$(G)/repo.json:   config
-	@echo "{{{##[ $@ ]##"
+# TODO! incorp  gh default-labels and default milestone
+
+repoFetch = $(shell curl -s -X GET -H 'Authorization: token $(GITHUB_ACCESS_TOKEN)'  $(API_REPO))
+
+$(G)/repo.json:
+	@echo "##[ $@ ]##"
+	@mkdir -p  $(dir $@)
 	@gh get-repo
-	@echo "}}}"
 
 ###############################################################################
 # ISSUE WITH TASK LIST
@@ -72,22 +110,30 @@ $(G)/repo.json:   config
 ###############################################################################
 #{{{
 
-issue: $(G)/issues.json
+issue: $(G)/issue.json
+
+issue-clean:
+	@if [ -e ISSUE.md ] ; then rm ISSUE.md; fi
+	@if [ -e $(G)/issue.json ] ; then rm $(G)/issue.json; fi
+	@if [ -e $(G)/headers/issue.txt ] ; then rm $(G)/headers/issue.txt; fi
+	@if [ -e $(G)/etags/issue.etag ] ; then rm $(G)/etags/issue.etag; fi
+	@if [ -e $(G)/issues.json ] ; then rm $(G)/issues.json; fi
+	@if [ -e $(G)/headers/issues.txt ] ; then rm $(G)/headers/issues.txt; fi
+	@if [ -e $(G)/etags/issues.etag ] ; then rm $(G)/etags/issues.etag; fi
+
+# $(call chkJson,$@)
 
 branch: $(G)/branch.json
 
-
-ISSUE.md: $(JSN_REPO)
-	@echo "{{{##[ $@ ]##"
+issue.md:
+	@echo "##[ $@ ]##"
 	$(if $(isMaster),gh new-issue-md ,)
-	$(call chkJson,$@)
-	@echo "}}}"
+	@echo ""
 
-$(G)/issue.json: ISSUE.md
-	@echo "{{{##[ $@ ]##"
-	$(if $(isMaster),gh create-issue,gh sync-issue)
-	$(call chkJson,$@)
-	@echo "}}}"
+$(G)/issue.json: issue.md
+	@echo "##[ $@ ]##"
+	@$(if $(isMaster),gh create-issue,gh sync-issue)
+	@echo ""
 # @echo  "CURRENT_BRANCH:  $(CURRENT_BRANCH)"
 # ifneq ($(CURRENT_BRANCH),master)
 # @echo "PARSED_ISSUE_NUMBER: $(PARSED_ISSUE_NUMBER)"
@@ -98,25 +144,29 @@ $(G)/issue.json: ISSUE.md
 # endif
 
 $(G)/issues.json: $(G)/issue.json
-	@echo "{{{##[ $@ ]##"
+	@echo "##[ $@ ]##"
 	@$(if $(isMaster),gh get-issues,)
-	@$(call chkJson,$@)
 	@gh list-issues
-	@echo "}}}"
+	@echo ""
 
 $(G)/branch.json: $(G)/issue.json $(G)/issues.json
 	@echo "{{{##[ $@ ]##"
+	@echo "Is Master: $(isMaster)!"
 	@echo 'ISSUE_NUMBER: $(shell echo $$(< $(<)) | jq '.number')'
 	@echo 'ISSUE_LABEL: $(shell echo $$(< $(<)) | jq '.labels[0]' | jq '.name')'
 	@echo 'ISSUE_TITLE: $(shell echo $$(< $(<)) | jq '.title')'
-	@echo "$(shell echo $$(< $(<)) | jq '[.labels[0].name ,.number, .title ] | .[] | @sh ' )"
+	@echo 'will become branch ... '
+	@echo "$(shell echo $$(< $(<)) | jq -r -c '"\(.labels[0].name)-\(.number)-\(.title)"' | sed 's/\s/-/g' )"
 	$(if $(isMaster),gh -v create-branch-from-current-issue,)
-	$(call chkJson,$@)
-	@$(if $$(gh latest-tag),\
- $(shell sed -i -r "s/^SEMVER=.*/SEMVER=$$(gh latest-tag)/" config) , )
-	@echo "}}}"
+	@echo 'update semver to latest tag'
+	@$(if $$(gh latest-tag),$(shell sed -i -r "s/^SEMVER=.*/SEMVER=$$(gh latest-tag)/" config), )
+	@echo ""
 
-
+# @echo "$(shell echo $$(< $(<)) | jq '[.labels[0].name ,.number, .title ] | .[] | @sh ' )"
+# $(if $(isMaster),gh -v create-branch-from-current-issue,)
+# $(call chkJson,$@)
+# @$(if $$(gh latest-tag),\
+# $(shell sed -i -r "s/^SEMVER=.*/SEMVER=$$(gh latest-tag)/" config) , )
 ###############################################################################
 # PULL REQUEST PHASE
 #  - pull-request
@@ -226,8 +276,8 @@ $(G)/merge.json: $(G)/pr-combined-status.json
 	@eval $$( echo '$(call cat,$<)' | jq '(.state == "success") and (contains({statuses: [{"description": "All good"}]}))')
 	@echo "pull request combined status all ready to merge"
 	@gh merge-pull-request
-	@$(MAKE) pr-merged
 
+# @$(MAKE) pr-merged
 
 postMergeInfo:
 	@echo 'post merge info'
@@ -241,12 +291,14 @@ pr-merged: config
 	@echo '---------------'
 	@echo 'latest tag:       ' $$(gh latest-tag)
 	@echo 'latest milestone: ' $$(gh latest-milestone)
-	@gh update-semver  $$(gh latest-tag)  $$(gh latest-milestone)
-	@sed -i -r "s/^SEMVER=.*/SEMVER=$$(gh update-semver $$(gh latest-tag) $$(gh latest-milestone))/" config
-	@$(MAKE) build
-	@$(MAKE) package
-	@$(MAKE) release
-	@$(MAKE) upload
+
+# @gh update-semver  $$(gh latest-tag)  $$(gh latest-milestone)
+# @gh update-semver  $$(gh latest-tag)  $$(gh latest-milestone)
+# @sed -i -r "s/^SEMVER=.*/SEMVER=$$(gh update-semver $$(gh latest-tag) $$(gh latest-milestone))/" config
+# @$(MAKE) build
+# @$(MAKE) package
+# @$(MAKE) release
+# @$(MAKE) upload
 
 # }}}
 ###############################################################################
@@ -273,14 +325,16 @@ release: $(G)/release.json
 upload: $(G)/tags.json
 
 $(G)/release.json: $(XAR)
-	@$(info {{{##[ $@ ]##)
-	@$(info create release using following params)
-	@$(info tag-name: $(VERSION))
-	@$(info name: $(ABBREV)-$(VERSION))
-	@$(info body: $(shell echo $$(<$(G)/pull-request.json) | jq '.body | @sh'))
-	@$(info xar: $(wildcard $(XAR)))
-	@gh create-release "v$(VERSION)" "$(ABBREV)-$(VERSION)" "$(shell echo $$(<$(G)/pull-request.json) | jq '.body | @sh')"
-	@echo "}}}"
+	@echo '##[ $@ ]##'
+	@echo 'create release using following params'
+	@echo 'tag-name: v$(VERSION)'
+	@echo 'name: $(ABBREV)-$(VERSION)'
+	@echo 'body: $(shell echo $$(<$(G)/pull-request.json) | jq '.body')'
+	@echo 'xar: $(wildcard $(XAR))'
+	@gh -v create-release 'v$(VERSION)' '$(ABBREV)-$(VERSION)' '$(shell echo $$(<$(G)/pull-request.json) | jq ".body")'
+	@echo "------------------------------------------------------------------"
+
+# @gh create-release "v$(VERSION)" "$(ABBREV)-$(VERSION)" "$(shell echo $$(<$(G)/pull-request.json) | jq '.body | @sh')"
 
 $(G)/asset_uploaded.json: $(G)/release.json
 	@echo "{{{##[ $@ ]##"
@@ -292,11 +346,11 @@ $(G)/asset_uploaded.json: $(G)/release.json
 	@echo "upload-url:"
 	@echo "$$(echo $$(<$(<)) | jq '.upload_url' | sed -r 's/\{.+//g')?name=$(notdir $(XAR))"
 	@echo "------------------------------------------------------------------ "
-	@echo "contentType: $(call getMimeType,$(suffix $(notdir $(XAR))))"
+	@echo "contentType: application/expath+xar"
 	@gh upload-release-asset \
  "$(XAR)" \
  "$(shell echo \"$$(echo $$(<$(<)) | jq '.upload_url' | sed -r 's/\{.+//g')?name=$(notdir $(XAR)))\")" \
- "$(call getMimeType,$(suffix $(notdir $(XAR))))"
+ "application/expath+xar"
 	@echo "}}}"
 
 $(G)/latest-release.json: $(G)/asset_uploaded.json
@@ -355,7 +409,6 @@ tag-semver-sync:
 #  "$(WEBSITE)" \
 #  "$(shell echo $$(<) |\
 #  jq '.assets[0] | .browser_download_url' )"
-
 
 .PHONY: deploy-local deploy-remote
 

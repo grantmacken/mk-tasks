@@ -4,8 +4,8 @@ local file=$1
 local fileName="$( echo "${file}" | sed 's%.*/%%')"
 local baseName="$( echo "${fileName}" | cut -d. -f1 )"
 #local basePath="$( echo "${file}" | sed 's%fileName%%')"
-local headerDump="${GITHUB_DIR}/headers/${baseName}.txt"
-local eTagFile="${GITHUB_DIR}/etags/${baseName}.etag"
+local headerDump="${G}/headers/${baseName}.txt"
+local eTagFile="${G}/etags/${baseName}.etag"
 [ -e ${file} ] && rm ${file} 
 [ -e ${eTagFile} ] && rm ${eTagFile} 
 [ -e ${headerDump} ] && rm ${headerDump} 
@@ -35,30 +35,29 @@ function repoFetch(){
   local fileName="$( echo "${file}" | sed 's%.*/%%')"
   local baseName="$( echo "${fileName}" | cut -d. -f1 )"
   #local basePath="$( echo "${file}" | sed 's%fileName%%')"
-  local headerDump="${GITHUB_DIR}/headers/${baseName}.txt"
-  local eTagFile="${GITHUB_DIR}/etags/${baseName}.etag"
+  local headerDump="${G}/headers/${baseName}.txt"
+  local eTagFile="${G}/etags/${baseName}.etag"
   local message=
   #repoRemoveFile "${file}"
-  echo "TASK! from github, fetch and store reponse"
-  echo "INFO! - *GET URL* : [ ${url} ]"
-  echo "INFO! - *RESPONSE FILE* : [ ${fileName} ]"
-  echo "INFO! - *fileName* : [ ${fileName} ]"
-  echo "INFO! - *baseName* : [ ${baseName} ]"
-  echo "INFO! - *headerDump* : [ ${headerDump} ]"
-  echo "INFO! - *eTagFile* : [ ${eTagFile} ]"
+  $verbose && echo "TASK! from github, fetch and store reponse"
+  $verbose &&  echo "INFO! - *ARG URL* : [ ${url} ]"
+  $verbose &&  echo "INFO! - *ARG file* : [ ${file} ]"
+ # $verbose && echo "INFO! - *RESPONSE FILE* : [ ${fileName} ]"
+  $verbose && echo "INFO! - *fileName* : [ ${fileName} ]"
+  $verbose && echo "INFO! - *baseName* : [ ${baseName} ]"
+  $verbose && echo "INFO! - *headerDump* : [ ${headerDump} ]"
+  $verbose && echo "INFO! - *eTagFile* : [ ${eTagFile} ]"
   [ -n "${fileName}" ] ||  return 1
   [ -n "${url}" ] || return 1
   [ -n "${file}" ] || return 1
 
-#grep -oP '^ETag: \K["\w]+'
-
-if [ -e ${file} ] ;then
-   cp ${file} ${TEMP_DIR}/${fileName}
-fi
+  if [ -e ${file} ] ;then
+    cp ${file} ${T}/${fileName}
+  fi
 
 if [ -e ${eTagFile} ] ;then
   local ETAG=$(<${eTagFile})
-  echo "INFO! - *ETAG* : [ ${ETAG} ]"
+   $verbose && echo "INFO! - *ETAG* : [ ${ETAG} ]"
   doRequest=$(
     curl -s \
     -X GET \
@@ -70,7 +69,7 @@ if [ -e ${eTagFile} ] ;then
     ${url}
     )
   else
-     echo "INFO! - *ETAG* : [ no-eTag ]"
+    $verbose && echo "INFO! - *ETAG* : [ no-eTag ]"
     doRequest=$(
     curl -s \
     -X GET \
@@ -79,21 +78,21 @@ if [ -e ${eTagFile} ] ;then
     -w %{http_code} \
     --dump-header  ${headerDump} \
     ${url}
-    )  
+    )
 fi
-  
+
 case "${doRequest}" in
   200)
     echo "OK! response ${doRequest}. OK"
     echo "INFO! response *stored* as: [ ${fileName} ]"
     echo "$(<${headerDump})" | grep -oP '^ETag: "\K(\w)+' > ${eTagFile}
-    [ -e ${TEMP_DIR}/${fileName} ] && rm ${TEMP_DIR}/${fileName}
+    [ -e ${T}/${fileName} ] && rm ${T}/${fileName}
     return 0
   ;;
   304)
     echo "OK! response ${doRequest}. OK"
     echo "INFO! ${fileName} is already up to date so will not be modified]"
-    [ -e ${TEMP_DIR}/${fileName} ] && mv ${TEMP_DIR}/${fileName} ${file}
+    [ -e ${T}/${fileName} ] && mv ${T}/${fileName} ${file}
     return 0
   ;;
   *)
@@ -106,7 +105,7 @@ case "${doRequest}" in
 esac
 }
 
-function repoCreate(){                             
+function repoCreate(){
 local url="$1"
 local file="$2"
 local jsn="$3"
@@ -134,24 +133,24 @@ ${url}
 
 if [ -e "${file}" ] ; then
   if [[ ${doRequest} = 201 ]] ; then
-	echo "OK! response ${doRequest}, created"
-	echo "SUCCESS! stored json reply as:  ${file}"
-	return 0
+    echo "OK! response ${doRequest}, created"
+    echo "SUCCESS! stored json reply as:  ${file}"
+    return 0
   else
-	echo "FAILURE! response ${doRequest}. post failure"
-	if [ -e "${file}" ] ; then
-	  # try to get failure message
-	  message=$(  cat "${file}" | jq '.message' )
-	  if [ -n "${message}" ] ; then
-		echo "FAILURE! - response [${doRequest}] ${message}"
-	  else
-		# dump it all
-		cat "${file}" | jq ''
-	  fi
-	fi
-	#clean up
-	# repoRemoveFile "${file}"
-	return 1
+    echo "FAILURE! response ${doRequest}. post failure"
+    if [ -e "${file}" ] ; then
+      # try to get failure message
+      message=$(  cat "${file}" | jq '.message' )
+      if [ -n "${message}" ] ; then
+        echo "FAILURE! - response [${doRequest}] ${message}"
+      else
+        # dump it all
+        cat "${file}" | jq ''
+      fi
+    fi
+    #clean up
+    # repoRemoveFile "${file}"
+    return 1
   fi
 else
   echo "FAILURE! - response file not created"

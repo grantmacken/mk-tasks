@@ -119,7 +119,6 @@ nSTR="J = require(${jsnFile});\
 node -e "${nSTR}"
 }
 
-
 function parseIntoArrayIssuesForBranches(){
 if [ ! -e "${JSN_ISSUES}" ] ; then
   echo "FAILURE: file required ${JSN_ISSUES}"
@@ -154,48 +153,32 @@ done
 echo "DONE! set issues for branches task completed"
 }
 
-
-
 function parseFetchedIssue(){
-if [ ! -e "${JSN_ISSUE}" ] ; then
-  echo "FAILURE: file required ${JSN_ISSUE}"
-  return 1
-fi
-local jsnFile="$(parseIntoNodeFS ${JSN_ISSUE})"
-local nSTR=
-ISSUE_PULLS_URL=
-if [ -z "$(node -pe "require('${jsnFile}')['pull_request']" | grep -oP 'undefined')" ]
- then
- ISSUE_PULLS_URL="$(node -pe "require('${jsnFile}')['pull_request']['url']")"
-fi
-# echo "$(<${JSN_ISSUE})" | jq '.'
-nSTR="J = require('${jsnFile}');\
- R = require('ramda');\
- j = R.pick([\
- 'url', 'comments_url', 'events_url',\
- 'title','number', 'labels', 'milestone' , 'state', 'updated_at',\
- 'comments', 'body'\
- ],J);\
- url = 'FETCHED_URL=' + R.prop('url',j);\
- events_url = 'FETCHED_EVENTS_URL=' + R.prop('events_url',j);\
- comments_url = 'FETCHED_COMMENTS_URL=' + R.prop('comments_url',j);\
- title = 'FETCHED_ISSUE_TITLE=\"' + R.prop('title',j) + '\"';\
- number = 'FETCHED_ISSUE_NUMBER=' + R.prop('number',j);\
- milestone_title = 'FETCHED_ISSUE_MILESTONE_TITLE=' + R.prop('milestone',j)['title'];\
- milestone_number = 'FETCHED_ISSUE_MILESTONE_NUMBER=' + R.prop('milestone',j)['number'];\
- label = 'FETCHED_ISSUE_LABEL=' + R.prop('labels',j)[0].name;\
- state = 'FETCHED_ISSUE_STATE=' + R.prop('state',j);\
- updated_at = 'FETCHED_ISSUE_UPDATED_AT=' + R.prop('updated_at',j);\
- comments = 'FETCHED_ISSUE_COMMENTS=' + R.prop('comments',j);\
- body = 'FETCHED_ISSUE_BODY=\"' + R.prop('body',j) + '\"';\
- print = function(x){console.log(x)};\
- R.forEach(print, \
- [url, comments_url, events_url, title, number, milestone_title ,\
- milestone_number, label , state, updated_at, comments,
- body ]);\
-"
-# node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
-source <(node -e "${nSTR}")
+  $verbose && echo 'Parse Fetched Issue' 
+  if [ ! -e "${JSN_ISSUE}" ] ; then
+    echo "FAILURE: file required ${JSN_ISSUE}"
+    return 1
+  fi
+  local jsnFile="$(parseIntoNodeFS ${JSN_ISSUE})"
+  # local nSTR=
+  ISSUE_PULLS_URL=
+  if [ -z "$(node -pe "require('${jsnFile}')['pull_request']" | grep -oP 'undefined')" ]
+  then
+    ISSUE_PULLS_URL="$(node -pe "require('${jsnFile}')['pull_request']['url']")"
+  fi
+
+  local nSTR="J = require('${jsnFile}');\
+    console.log('FETCHED_ISSUE_URL=' + J.url );\
+    console.log('FETCHED_ISSUE_NUMBER=' + J.number);\
+    console.log('FETCHED_ISSUE_STATE=' + J.state);\
+    console.log('FETCHED_ISSUE_TITLE=\'' + J.title + '\'') ;\
+    console.log('FETCHED_ISSUE_BODY=\'' + J.body + '\'') ;\
+    console.log('FETCHED_ISSUE_MILESTONE_DESCRIPTION=\'' + J.milestone.description + '\'') ;\
+    console.log('FETCHED_ISSUE_MILESTONE_TITLE=\'' + J.milestone.title + '\'') ;\
+    console.log('FETCHED_ISSUE_LABEL=\'' + J.labels[0].name + '\'') ;\
+    "
+  $verbose && node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
+  source <(node -e "${nSTR}")
 }
 
 
@@ -220,9 +203,9 @@ function parseIssueMD(){
   ISSUE_BODY="$( branchEchoIssueBody )"
   ISSUE_SUMMARY="$( branchEchoIssueSummary )"
   $verbose &&  echo "INFO! - *ISSUE_SUMMARY*: [ ${ISSUE_SUMMARY} ]"
-  parseIntoArrayTaskList 'ISSUE_TASK_LIST'
-  parseIntoArrayFinishedTasks 'ISSUE_FINISHED_TASKS'
-  parseIntoArrayUnfinishedTasks 'ISSUE_UNFINISHED_TASKS'
+  # parseIntoArrayTaskList 'ISSUE_TASK_LIST'
+  # parseIntoArrayFinishedTasks 'ISSUE_FINISHED_TASKS'
+  # parseIntoArrayUnfinishedTasks 'ISSUE_UNFINISHED_TASKS'
 }
 
 function parseIssuePayload(){
@@ -257,20 +240,10 @@ echo "$( sed "1,${lineCount}d;$d" ${ISSUE_FILE} | head -n1 )"
 }
 
 function parseIntoArrayLabels(){
-  jsnLABELS=$(<${JSN_LABELS})
-   echo "${jsnLABELS}" > $TEMP_FILE
-  #echo "${jsnMILESTONES}" | jq -r -c '.[] | [ .title ] '
-  #echo "${jsnMILESTONES}" | R -p  'identity'
-IFS=$'\n\r'
-readarray LABELS <<< $(echo "${jsnLABELS}" | R  'pluck \name' -o raw)
-for item in  "${LABELS[@]}"
-  do
-	echo "${item}"
-  done
+  $verbose && echo 'parse into array labels'
+  LABELS=( $(echo "$(<${JSN_LABELS})"  | jq -r '.[] | .name  | @sh') ) 
+  $verbose && for item in "${LABELS[@]}"; do echo "label [ ${item} ] "; done
 }
-
-
-
 
 function parseIntoArrayTaskList(){
 grep -oP '^\-\s\[.\]\s\K.+$' ${ISSUE_FILE} > $TEMP_FILE
@@ -333,6 +306,7 @@ nSTR="J = require('${jsnFile}');\
   console.log('REPO_ISSUE_COMMENT_URL=' +  J.issue_comment_url.split('{')[0]);\
   console.log('REPO_COMPARE_URL=' +  J.compare_url.split('{')[0]);\
   console.log('REPO_HTML_URL=' +  J.html_url.split('{')[0]);\
+
 "
 source <(node -e "${nSTR}")
 }
@@ -341,57 +315,29 @@ function parsePullRequest(){
 [ ! -e "${JSN_PULL_REQUEST}" ] && return 1
 local jsnFile="$(parseIntoNodeFS ${JSN_PULL_REQUEST})"
 local nSTR="J = require('${jsnFile}');\
- R = require('ramda');\
- j = R.pick([\
- 'html_url','title','number','milestone','state', 'commits' , 'updated_at',\
- 'comments','review_comments','merged','mergeable','mergeable_state',\
- 'body','head','base',\
- 'url','commits_url', 'review_comments_url', 'comments_url', 'statuses_url'\
- ],J);\
- title = 'PR_TITLE=\"' + R.prop('title',j) + '\"';\
- number = 'PR_NUMBER=' + R.prop('number',j);\
- milestone_title = 'PR_MILESTONE_TITLE=' + R.prop('milestone',j)['title'];\
- milestone_number = 'PR_MILESTONE_NUMBER=' + R.prop('milestone',j)['number'];\
- state = 'PR_STATE=' + R.prop('state',j);\
- commits = 'PR_COMMITS=' + R.prop('commits',j);\
- updated_at = 'PR_UPDATED_AT=' + R.prop('updated_at',j);\
- comments = 'PR_COMMENTS=' + R.prop('comments',j);\
- review_comments = 'PR_REVIEW_COMMENTS=' + R.prop('review_comments',j);\
- merged = 'PR_MERGED=' + R.prop('merged',j);\
- mergeable = 'PR_MERGEABLE=' + R.prop('mergeable',j);\
- mergeable_state = 'PR_MERGEABLE_STATE=' + R.prop('mergeable_state',j);\
- body = 'PR_BODY=\"' + R.prop('body',j) + '\"';\
- head_sha =  'PR_HEAD_SHA=' + R.prop('head',j)['sha'];\
- head_ref =  'PR_HEAD_REF=' + R.prop('head',j)['ref'];\
- base_sha =  'PR_BASE_SHA=' + R.prop('base',j)['sha'];\
- base_ref =  'PR_BASE_REF=' + R.prop('base',j)['ref'];\
- url = 'PR_URL=' + R.prop('url',j);\
- commits_url = 'PR_COMMITS_URL=' + R.prop('commits_url',j);\
- statuses_url = 'PR_STATUSES_URL=' + R.prop('statuses_url',j);\
- review_comments_url = 'PR_REVIEW_COMMENTS_URL=' + R.prop('review_comments_url',j);\
- comments_url = 'PR_COMMENTS_URL=' + R.prop('comments_url',j);\
- html_url = 'PR_HTML_URL=' + R.prop('html_url',j);\
- print = function(x){console.log(x)};\
- R.forEach(print, [\
- title, \
- number, \
- milestone_title ,\
- milestone_number, \
- state, \
- commits, \
- updated_at, \
- comments, \
- review_comments, \
- merged, \
- mergeable, \
- mergeable_state, \
- body,\
- head_sha, head_ref, base_sha, base_ref, \
- url, commits_url, comments_url, review_comments_url, statuses_url, html_url
- ]);\
+  console.log('PR_URL=' + J.url);\
+  console.log('PR_COMMITS_URL=' + J.commits_url);\
+  console.log('PR_REVIEW_COMMENTS_URL=' + J.review_comments_url);\
+  console.log('PR_COMMENTS_URL=' + J.comments_url);\
+  console.log('PR_STATUSES_URL=' + J.statuses_url);\
+  console.log('PR_NUMBER=' + J.number);\
+  console.log('PR_TITLE=\'' + J.title + '\'');\
+  console.log('PR_BODY=\'' + J.body + '\'');\
+  console.log('PR_STATE=' + J.state);\
+  console.log('PR_LOCKED=' + J.locked);\
+  console.log('PR_MERGED=' + J.merged);\
+  console.log('PR_MERGEABLE=' + J.mergeable);\
+  console.log('PR_MERGEABLE_STATE=' + J.mergeable_state);\
+  console.log('PR_HEAD_SHA=' + J.head.sha);\
+  console.log('PR_COMBINED_STATUS_URL=${REPO_COMMITS_URL}/' + J.head.sha + '/status');\
+  console.log('PR_HEAD_COMMENTS=' + J.comments);\
+  console.log('PR_REVIEW_COMMENTS=' + J.review_comments);\
+  console.log('PR_MILESTONE_NUMBER=' + J.milestone.number);\
+  console.log('PR_MILESTONE_TITLE=\'' + J.milestone.title + '\'');\
+  console.log('PR_MILESTONE_DESCRIPTION=\'' + J.milestone.description + '\'');\
+
 "
-# debug with below
-# node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
+$verbose && node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
 source <(node -e "${nSTR}")
 }
 
