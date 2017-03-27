@@ -1,10 +1,6 @@
 #!/bin/bash +x
 ####################
-# if [ $# -ne 1 ]; then
-#     echo  $0: usage: requires 1 param [ file ]
-#     exit 1
-# fi
-verbose=true
+
 [ ! -e "config" ] &&  exit
 source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
 [ ! -e "../common.properties" ] &&  exit
@@ -12,77 +8,85 @@ source ../common.properties
 [ ! -e "../project.properties" ] &&  exit
 source ../project.properties
 
-# VERSION=$(echo "${SEMVER}" | sed 's/v//')
+echoERR() { printf "%s\n" "$*" >&2; }
 
+verbose=false
+ # params=( file )
+ARGS_COUNT=$#
+action=
+version=
+downloadURL=
+gh get-latest-release
+downloadURL="$( gh info-asset-download-url )"
+case $1 in
+  install)
+    version=$( echo "$( gh info-release-tag-name )" | sed 's/v//' )
+    # installString="repo:install-and-deploy('${GIT_REPO_NAME}','${version}','${downloadURL}')/*/@result/string()"
+    action=$1
+    $verbose && echo "download url[ ${downloadURL} ]"
+    $verbose && echo "version [ ${version} ]"
+    shift
+    ;;
+  remove)
+    action=$1
+    # action="'remove ${GIT_REPO_NAME} : ', repo:remove('${GIT_REPO_NAME}'),'&#10;',"
+    shift
+    ;;
+  list)
+    action=$1
+    # action="'eXist version: ' ||  system:get-version() || '&#10;',"
+    shift
+    ;;
+esac
 
-function saxonQuery(){
-java -cp $SAXON \
-  net.sf.saxon.Query \
-  \!method=text \
-  -qversion:3.0 \
-  -qs:"${1}"
-}
+if [ -z "${action}" ]; then
+  echoERR 'usage: 1 param required either ( install, remove or list ) '
+  exit 1
+fi
 
-function echoERR() {
-  printf "%s\n" "$*" >&2;
-}
-
-latestRelease=$(curl -s https://api.github.com/repos/${GIT_REPO_FULL_NAME}/releases/latest )
-# $verbose  && echo "${latestRelease}"
-
-downloadURL=$( echo "$latestRelease" | jq -r '.assets[] | .browser_download_url' )
-downloadFile='file:///home/gmack/projects/grantmacken/gmack.nz/deploy/gmack-0.9.0.xar'
-
-version=$( echo "$latestRelease" | jq -r '.tag_name' | sed 's/v//' )
-install="'deploy ${GIT_REPO_NAME} : ',repo:install-and-deploy('${GIT_REPO_NAME}','${version}','${downloadURL}'),'&#10;',"
-install2="'deploy ${GIT_REPO_NAME} : ',repo:install-and-deploy('${GIT_REPO_NAME}','${downloadFile}'),'&#10;',"
-remove="'remove ${GIT_REPO_NAME} : ', repo:remove('${GIT_REPO_NAME}'),'&#10;',"
-$verbose  && echo "download url[ ${downloadURL} ]"
-$verbose  && echo "repo name [ ${GIT_REPO_NAME} ]"
-$verbose  && echo "version [ ${version} ]"
-
-max='1'
+endpoint="https://${NAME}/exist"
+$verbose  && echo "endpoint [ ${endpoint} ]"
+auth="Authorization: Bearer ${SITE_ACCESS_TOKEN}" 
+# $verbose  && echo "auth [ ${auth} ]"
+contentType='Content-Type: application/xml'
+$verbose  && echo "content-type[ ${contentType} ]"
+downloadurl=$( gh info-asset-download-url )
+version=$( echo "$( gh info-release-tag-name )" | sed 's/v//' )
+max='99'
 postData="$(
 cat <<EOF
 <query xmlns='http://exist.sourceforge.net/NS/exist'
  start='1'
  wrap='no'
- max='99'>
+ max='${max}'>
 <text><![CDATA[
 xquery version '3.1';
-declare namespace output = 'http://www.w3.org/2010/xslt-xquery-serialization';
-declare option output:method 'text';
-declare option output:media-type 'text/plain';
-declare option output:item-separator '&#10;';
-declare option output:encoding 'UTF-8';
 (
-'this repo download url: ${downloadURL} &#10;' ,
-'this repo name : ${GIT_REPO_NAME} &#10;' ,
-'repo root: '  || repo:get-root() || '&#10;' ,
-${install2}
-'repo list:&#10;=========&#10;'  || \
-  string-join(repo:list() , '&#10;' ) || '&#10;'
+'repo download url: ${downloadURL} &#10;' ,
+'repo name: ${GIT_REPO_NAME} &#10;' ,
+'repo version: ${version} &#10;' ,
+'repo root: ' || repo:get-root() || '&#10;' ,
+if( '${action}' eq 'list' ) then (  '${action} &#10;' )
+else if( '${action}' eq 'remove' ) then (
+  let \$action := repo:remove('${GIT_REPO_NAME}')
+  return  '${action} ${GIT_REPO_NAME} : ' || string(\$action) )
+else if( '${action}' eq 'install' ) then (
+   repo:install-and-deploy('${GIT_REPO_NAME}','${version}',xs:anyURI('${downloadurl}')) 
+  )
+else (),
+'&#10;repo list:&#10;=========&#10;'  || \
+  string-join(repo:list() , '&#10;' ) || '&#10;' ,
+'&#10;restxq uri:&#10;=========&#10;'  || \
+ string-join( distinct-values( rest:resource-functions()//*/@xquery-uri/string() ) , '&#10;' ) || '&#10;' 
 )
 ]]></text>
 </query>
 EOF
 )"
-$verbose  && echo "${postData}"
-endpoint="http://localhost:8080/exist/rest/db"
-# $verbose  && echo "endpoint [ ${endpoint} ]"
-auth="${GIT_USER}:${GITHUB_ACCESS_TOKEN}"
-# $verbose  && echo "auth [ ${auth} ]"
-contentType='Content-Type: application/xml'
 
-# $verbose  && echo "content-type[ ${contentType} ]"
-# $verbose  && echo "auth[ ${auth} ]"
-# $verbose  && echo "content-type[ ${postData} ]"
-
-curl -s \
- -u "$auth" \
+curl -s --http1.1 \
+ -H "$auth" \
  -H "$contentType" \
  -d "$postData" \
  $endpoint
 
-# 'remove ${GIT_REPO_NAME} : ', repo:remove('${GIT_REPO_NAME}'),'&#10;',
-# 'deploy ${GIT_REPO_NAME} : ', repo:install-and-deploy('${GIT_REPO_NAME}',${version},'${downloadURL}'), '&#10;',

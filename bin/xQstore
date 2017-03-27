@@ -1,21 +1,41 @@
 #!/bin/bash +x
 ####################
-# gf  ../../dotfiles/nvim/compiler/xQcompile.vim
-if [ $# -ne 1 ]; then
-    echo  $0: usage: requires 1 param [ file ]
-    exit 1
-fi
-verbose=false
-[ ! -e "config" ] &&  exit
+[ ! -e config ] &&  exit
+# clean up config before read source
+sed -i '/^[[:space:]]*$/d;s/[[:space:]]*$//' config
 source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
 [ ! -e "../common.properties" ] &&  exit
 source ../common.properties
 [ ! -e "../project.properties" ] &&  exit
 source ../project.properties
-# [ ! -d "build" ] && mkdir build
-# [ ! -d "deploy" ] && mkdir deploy
-# [ ! -d ".github" ] && mkdir '.github'
 # NOTE! xQuery matches uses regex 
+verbose=false
+host=127.0.0.1
+while getopts "v" OPTION; do
+  case ${OPTION} in
+    v)
+      verbose=true
+      ;;
+    *)
+      ;;
+  esac
+done
+shift $((OPTIND -1))
+
+
+function echoERR() {
+  printf "%s\n" "$*" >&2;
+}
+
+if [ $# -ne 1 ]; then
+  echoERR  'usage: requires 1 param [ file ]'
+  exit 1
+fi
+if [ ! -e ${1} ]; then
+  echoERR  "file does not exist"
+  exit 1
+fi 
+
 function getMimeType( ){
 saxonQuery  "doc('file:///${EXIST_HOME}/mime-types.xml')//mime-type[matches(./extensions,'(^\\.${1},)|,\\.${1},|\\.${1}$')]/@name/string()"
 }
@@ -28,18 +48,9 @@ java -cp $SAXON \
   -qs:"${1}"
 }
 
-function echoERR() {
-  printf "%s\n" "$*" >&2;
-}
-
-if [ ! -e ${1} ]; then
-  echoERR  "file does not exist"
-  exit 1
-fi 
-
 # $verbose  && echo "SAXON [ ${SAXON} ]"
 # $verbose  && echo "EXIST HOME  [ ${EXIST_HOME} ]"
-domain=${NAME}
+domain="${NAME}"
 $verbose  && echo "domain [ ${domain} ]"
 absPath=$(readlink -f $1)
 relPath=${absPath#*${domain}/} 

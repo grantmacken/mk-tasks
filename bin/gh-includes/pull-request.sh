@@ -669,12 +669,7 @@ fi
 [ -z "${PR_BASE_REF}" ] && return 1
 [ -z "${PR_HEAD_REF}" ] && return 1
 
-
-echo "TASK! checkout master"
-doTask=$( git checkout ${PR_BASE_REF} )
-echo "DONE! checked out master ${doTask}"
-source "../project.properties"
-echo "INFO! - CURRENT_BRANCH [ ${CURRENT_BRANCH} ]"
+cho "INFO! - CURRENT_BRANCH [ ${CURRENT_BRANCH} ]"
 if [ ${CURRENT_BRANCH} = 'master' ] ; then
   echo "TASK! working directory up to date with origin"
   #The --prune option removes remote-tracking branches that no longer exist on the
@@ -686,49 +681,7 @@ if [ ${CURRENT_BRANCH} = 'master' ] ; then
   echo "TASK! delete remote branch ${PR_HEAD_REF}"
   doTask=$(git push origin --delete ${PR_HEAD_REF})
   echo "DONE! ${doTask}"
-  # echo "TASK! delete issue and associated pull-request files"
-  # [ -e ${JSN_ISSUE} ] && {
-  #  etagFile=$(parseIntoETAG ${JSN_ISSUE})
-  #  rm ${JSN_ISSUE}
-  #  rm ${etagFile}
-  #  }
-  # [ -e ${JSN_PULL_REQUEST} ] && {
-  #  etagFile=$(parseIntoETAG ${JSN_PULL_REQUEST})
-  #  rm ${JSN_PULL_REQUEST}
-  #  rm ${etagFile}
-  #  }
-  # [ -e ${JSN_PR_STATUSES} ] && {
-  #   etagFile=$(parseIntoETAG ${JSN_PR_STATUSES})
-  #   rm ${JSN_PR_STATUSES}
-  #   rm ${etagFile}
-  #   }
-  # [ -e ${JSN_PR_COMMITS} ] && {
-  #   etagFile=$(parseIntoETAG ${JSN_PR_COMMITS})
-  #   rm ${JSN_PR_COMMITS}
-  #   rm ${etagFile}
-  #   }
-  # [ -e ${JSN_PR_STATUS} ] && {
-  #   etagFile=$(parseIntoETAG ${JSN_PR_STATUS})
-  #   rm ${JSN_PR_STATUS}
-  #   rm ${etagFile}
-  #   }
-  # [ -e ${JSN_PR_COMMENTS} ] && {
-  #   etagFile=$(parseIntoETAG ${JSN_PR_COMMENTS})
-  #   rm ${JSN_PR_COMMENTS}
-  #   rm ${etagFile}
-  #   }
-  # [ -e ${JSN_PR_COMMENT} ] && {
-  #   etagFile=$(parseIntoETAG ${JSN_PR_COMMENT})
-  #   rm ${JSN_PR_COMMENT}
-  #   rm ${etagFile}
-  #  }
-  # [ -e ${JSN_MERGE} ] && {
-  #   etagFile=$(parseIntoETAG ${JSN_MERGE})
-  #   rm ${JSN_MERGE}
-  #   rm ${etagFile}
-  #   }
 fi
-
 }
 
 
@@ -828,26 +781,6 @@ fi
 ##        fi
 ##    fi
 ##fi
-#
-#if [[ "${PR_STATUS_STATE}" = 'success' ]] ; then
-#  echo 'INFO! Lookin good ... going to merge'
-#  echo "CHECK! for commits on *master* not in *${CURRENT_BRANCH}*"
-#  return
-#  chk=$( git log ..master )
-#  if [[ -z ${chk} ]] ; then
-#	  echo "YEP! *no* rebase required"
-#  else
-#	  #return 1
-#	  echo "NOPE! there are commits on *master* not in *${CURRENT_BRANCH}*"
-#	  echo "TASK!  rebase required"
-#	  doTask=$( git rebase -i master ${CURRENT_BRANCH} )
-#	  #git rebase -i master enhancement-11-First-working-build
-#	  echo "DONE!  ${doTask}"
-#  fi
-#  echo "TASK!  tidy up merge message "
-#  closeIssueLine="This resolves #${PR_NUMBER}"
-## step 1 not sure about last rebase???
-#
 ## step 2 tidy up merge message
 ##echo 'Ship worked on feature via an explicit merge with master branch"
 ##echo 'Feature will be official on  master branch "
@@ -867,91 +800,4 @@ fi
 #  } 
 #  EOF
 #  )
-#  
-#  repoPut "${PULLS_URL}/merge" "${GITHUB_MERGE}" "${jsn}"
-#  
-#  if [ -e ${GITHUB_MERGE} ] ; then
-#	MERGED=$(node -pe "require('${GITHUB_MERGE}')['merged']" )
-#	echo "INFO! - *MERGED* [ ${MERGED} ]"
-#  fi
-#  
-##  git checkout master
-##  git merge \
-##	  --no-ff \
-##	  --log \
-##	  --progress \
-##	  --verbose \
-##	  ${CURRENT_BRANCH}
-##  git push origin master
-##  echo "TASK! delete local branch: ${CURRENT_BRANCH}"
-##  doTask=$(git branch -D ${CURRENT_BRANCH})
-##  echo "DONE! ${doTask}"
-##  echo "TASK! delete remote branch ${CURRENT_BRANCH}"
-##  doTask=$(git push origin --delete ${CURRENT_BRANCH})
-##  echo "DONE! ${doTask}"
-#        
-##now create release with release artifact
-#    #if utilityAskYesNO "${question}" ; then
-#    # question='do you want to tag and release on github ' 
-#    # if utilityAskYesNO "${question}" ; then
-#    #    if ! releaseCreateRelease ; then
-#    #      return 1
-#    #    fi
-#    # else
-#    #     return 0 
-#    # fi
-#    #    
-#    #fi
-#fi
-#
-#
-#    
-#    
-#    # todo check statuses of empty explitly upload pending state
-#    
-#    
-##    echo "CHECK! if pull request status set on github  "
-##    jsnPR_STATUS=$( cat ${GITHUB_PR_STATUS} )
-##    chkEmpty=$( echo  "${jsnPR_STATUS}"  | jq ' . |  length' )
-##    if [[ $chkEmpty -ne 0 ]] ; then
-##         echo "YEP! status set and available'    
-##    else
-##        echo "NOPE! status not yet set "
-##        echo "TASK! set status of pull_request to pending "
-##    
-##       jsn=$(
-##        echo "{\"state\":\"pending\",\
-##        \"description\":\"waiting for review and integration tests\" ,\
-##        \"context\": \"default\" }" | jq -c -r '."
-##        )
-##        echo "INFO! json payload"
-###The state of the status. Can be one of pending, success, error, or failure
-##        echoLine
-##        echo "$jsn" | jq '.'
-##        echoLine
-##        doRequest=$(
-##        curl \
-##        -H "Accept: application/json" \
-##        -H "Authorization: token ${GITHUB_ACCESS_TOKEN}" \
-##        -o ${GITHUB_PR_STATUS} \
-##        -w "%{http_code}" \
-##        -d "${jsn}" \
-##        ${PR_STATUSES_URL}
-##        )
-##        if [[ ${doRequest} = 201 ]] ; then
-##            echo "OK!  ${doRequest} created status '
-##        else
-##            echo "FAILURE! ${doRequest}'
-##            exit
-##        fi    
-##    fi
-#
-## step 2
-##
-
-#
-#}
-
-
-
 

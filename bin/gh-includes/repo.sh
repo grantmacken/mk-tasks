@@ -83,18 +83,18 @@ fi
 
 case "${doRequest}" in
   200)
-    echo "OK! response ${doRequest}. OK"
-    echo "INFO! response *stored* as: [ ${fileName} ]"
+    $verbose echo "OK! response ${doRequest}. OK"
+    $verbose echo echo "INFO! response *stored* as: [ ${fileName} ]"
     echo "$(<${headerDump})" | grep -oP '^ETag: "\K(\w)+' > ${eTagFile}
     [ -e ${T}/${fileName} ] && rm ${T}/${fileName}
     return 0
-  ;;
+    ;;
   304)
-    echo "OK! response ${doRequest}. OK"
-    echo "INFO! ${fileName} is already up to date so will not be modified]"
+    $verbose echo "OK! response ${doRequest}. OK"
+    $verbose echo "INFO! ${fileName} is already up to date so will not be modified]"
     [ -e ${T}/${fileName} ] && mv ${T}/${fileName} ${file}
     return 0
-  ;;
+    ;;
   *)
     echo "FAILURE! response ${doRequest}."
     if [ -e "${file}" ] ; then

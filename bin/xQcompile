@@ -5,15 +5,15 @@ if [ $# -ne 1 ]; then
     echo  $0: usage: requires 1 param [ file ]
     exit 1
 fi
-
-[ ! -e "config" ] &&  exit
+[ ! -e config ] &&  exit
+# clean up config before read source
+sed -i '/^[[:space:]]*$/d;s/[[:space:]]*$//' config
 source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
 [ ! -e "../common.properties" ] &&  exit
 source ../common.properties
 [ ! -e "../project.properties" ] &&  exit
 source ../project.properties
-
-verbose=false
+verbose=true
  # params=( file )
 absPath=$(readlink -f $1)
 relPath=$( echo "$absPath" | grep -oP '^.+\Kmodules/.+$' )
@@ -58,6 +58,7 @@ if ( \$compiled/@result/string() eq 'fail'  ) then (
 </query>
 EOF
 )"
+
 # ${moduleLoadPath}
 # CompilerSet errorformat+=%f:%l:%t:\ %
 # '${absPath'

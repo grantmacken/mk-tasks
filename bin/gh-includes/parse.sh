@@ -181,7 +181,6 @@ function parseFetchedIssue(){
   source <(node -e "${nSTR}")
 }
 
-
 function parseIssueMD(){
   # front-matter as a source
   [ -e ${ISSUE_FILE} ] || return 1
@@ -306,7 +305,6 @@ nSTR="J = require('${jsnFile}');\
   console.log('REPO_ISSUE_COMMENT_URL=' +  J.issue_comment_url.split('{')[0]);\
   console.log('REPO_COMPARE_URL=' +  J.compare_url.split('{')[0]);\
   console.log('REPO_HTML_URL=' +  J.html_url.split('{')[0]);\
-
 "
 source <(node -e "${nSTR}")
 }
@@ -329,13 +327,17 @@ local nSTR="J = require('${jsnFile}');\
   console.log('PR_MERGEABLE=' + J.mergeable);\
   console.log('PR_MERGEABLE_STATE=' + J.mergeable_state);\
   console.log('PR_HEAD_SHA=' + J.head.sha);\
+  console.log('PR_HEAD_REF=' + J.head.ref);\
+  console.log('PR_HEAD_LABEL=' + J.head.ref);\
+  console.log('PR_BASE_SHA=' + J.base.sha);\
+  console.log('PR_BASE_REF=' + J.base.ref);\
+  console.log('PR_BASE_LABEL=' + J.base.ref);\
   console.log('PR_COMBINED_STATUS_URL=${REPO_COMMITS_URL}/' + J.head.sha + '/status');\
-  console.log('PR_HEAD_COMMENTS=' + J.comments);\
+  console.log('PR_COMMENTS=' + J.comments);\
   console.log('PR_REVIEW_COMMENTS=' + J.review_comments);\
   console.log('PR_MILESTONE_NUMBER=' + J.milestone.number);\
   console.log('PR_MILESTONE_TITLE=\'' + J.milestone.title + '\'');\
   console.log('PR_MILESTONE_DESCRIPTION=\'' + J.milestone.description + '\'');\
-
 "
 $verbose && node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
 source <(node -e "${nSTR}")
@@ -357,13 +359,39 @@ echo "INFO! - *PR_COMBINED_STATUS_STATE*: [ ${PR_COMBINED_STATUS_STATE} ]"
 echo "INFO! - *PR_COMBINED_STATUS_TOTAL_COUNT*: [ ${PR_COMBINED_STATUS_TOTAL_COUNT} ]"
 }
 
-function parseRelease(){
-RELEASE_UPLOAD_URL=
-#HTML_URL=
-RELEASE_TAG_NAME=
-#TARGET_COMMITISH=
-RELEASE_NAME=
-#TARBALL_URL=
+
+function parseLatestRelease(){
+[ ! -e "${JSN_LATEST_RELEASE}" ] && return 1
+local jsnFile="$(parseIntoNodeFS ${JSN_LATEST_RELEASE})"
+local nSTR="J = require('${jsnFile}');\
+  console.log('RELEASE_URL=' + J.url);\
+  console.log('RELEASE_NAME=' + J.name);\
+  console.log('RELEASE_TAG_NAME=' + J.tag_name);\
+  console.log('RELEASE_UPLOAD_URL=' + J.upload_url.split('{')[0] );\
+  console.log('RELEASE_ID=' + J.id);\
+  console.log('RELEASE_BODY=\"' + J.body + '\"');\
+  console.log('TARBALL_URL=' + J.tarball_url);\
+  console.log('ZIPBALL_URL=' + J.zipball_url);\
+  if (J.assets.length ) { \
+    console.log('RELEASE_ASSET_COUNT=' + J.assets.length);\
+    console.log('ASSET_NAME=' + J.assets[0].name);\
+    console.log('ASSET_LABEL=' + J.assets[0].label);\
+    console.log('ASSET_CONTENT_TYPE=' + J.assets[0].content_type);\
+    console.log('ASSET_STATE=' + J.assets[0].state);\
+    console.log('ASSET_SIZE=' + J.assets[0].size);\
+    console.log('ASSET_DOWNLOAD_COUNT=' + J.assets[0].download_count);\
+    console.log('ASSET_CREATED_AT=' + J.assets[0].created_at);\
+    console.log('ASSET_UPDATED_AT=' + J.assets[0].updated_at);\
+    console.log('ASSET_BROWSER_DOWNLOAD_URL=' + J.assets[0].browser_download_url);\
+    console.log('ASSET_UPLOADER=' + J.assets[0].uploader.login);\
+  }\
+"
+$verbose && node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
+# set -a
+source <(node -e "${nSTR}")
+# set +a
+
+#=
 #ZIPBALL_URL=
 #BODY=
 #CONTENT_TYPE=
@@ -372,48 +400,6 @@ RELEASE_NAME=
 #DOWNLOAD_COUNT=
 #BROWSER_DOWNLOAD_URL=
 
-local jsnFile="$( parseIntoNodeFS ${jSN_RELEASE} )"
-local nSTR="J = require('${jsnFile}');\
- R = require('ramda');\
- j = R.pick([\
- 'upload_url','tag_name','name'
- ],J);\
- upload_url = 'RELEASE_UPLOAD_URL=' + \
-  R.substringTo(R.strIndexOf('{',R.prop('upload_url',j)),R.prop('upload_url',j)) \
-  + '?name=';\
- tag_name = 'RELEASE_TAG_NAME=' + R.prop('tag_name',j);\
- name = 'RELEASE_NAME=' + R.prop('name',j);\
- print = function(x){console.log(x)};\
- R.forEach(print, [\
- upload_url,\
- tag_name, \
- name
- ]);\
-"
-
-#node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
-source <(node -e "${nSTR}")
-
-echo "INFO! - *RELEASE_UPLOAD_URL*: [ ${RELEASE_UPLOAD_URL} ]"
-echo "INFO! - *RELEASE_TAG_NAME*: [ ${RELEASE_TAG_NAME} ]"
-echo "INFO! - *RELEASE_NAME*: [ ${RELEASE_NAME} ]"
-
-}
-
-function parseLatestRelease(){
-[ ! -e "${JSN_LATEST_RELEASE}" ] && return 1
-jsnFile="$(parseIntoNodeFS ${JSN_LATEST_RELEASE})"
-nSTR="J = require('${jsnFile}');\
-  console.log('RELEASE_URL=' + J.url);\
-  console.log('RELEASE_NAME=' + J.name);\
-  console.log('RELEASE_TAG_NAME=' + J.tag_name);\
-  console.log('RELEASE_UPLOAD_URL=' + J.upload_url.split('{')[0] );\
-  console.log('RELEASE_ID=' + J.id);\
-  console.log('RELEASE_BODY=\"' + J.body + '\"');\
-  if (J.assets.length ) { console.log('RELEASE_ASSET_COUNT=' + J.assets.length) }
-"
-source <(node -e "${nSTR}")
-node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
 
 return 0
 # if [ ! -e "${JSN_LATEST_RELEASE}" ] ; then
@@ -434,32 +420,8 @@ return 0
 #DOWNLOAD_COUNT=
 #BROWSER_DOWNLOAD_URL=
 
-# local jsnFile="$( parseIntoNodeFS ${JSN_LATEST_RELEASE} )"
 
-# nSTR="J = require('${jsnFile}');\
-#  R = require('ramda');\
-#  j = R.pick([\
-#  'upload_url','tag_name','name'
-#  ],J);\
-#  upload_url = 'RELEASE_UPLOAD_URL=' + \
-#   R.substringTo(R.strIndexOf('{',R.prop('upload_url',j)),R.prop('upload_url',j)) \
-#   + '?name=';\
-#  tag_name = 'RELEASE_TAG_NAME=' + R.prop('tag_name',j);\
-#  name = 'RELEASE_NAME=' + R.prop('name',j);\
-#  print = function(x){console.log(x)};\
-#  R.forEach(print, [\
-#  upload_url,\
-#  tag_name, \
-#  name
-#  ]);\
-# "
 
-#node -e "${nSTR}" | while IFS= read -r line; do echo "$line"; done
-# source <(node -e "${nSTR}")
-
-# echo "INFO! - *RELEASE_UPLOAD_URL*: [ ${RELEASE_UPLOAD_URL} ]"
-# echo "INFO! - *RELEASE_TAG_NAME*: [ ${RELEASE_TAG_NAME} ]"
-# echo "INFO! - *RELEASE_NAME*: [ ${RELEASE_NAME} ]"
 }
 
 

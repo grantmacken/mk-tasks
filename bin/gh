@@ -41,7 +41,6 @@ JSN_PR_COMBINED_STATUS="${G}/pr-combined-status.json"
 JSN_MERGE="${G}/merge.json"
 #RELEASES
 JSN_RELEASES="${G}/releases.json"
-JSN_RELEASE="${G}/release.json"
 JSN_LATEST_RELEASE="${G}/latest-release.json"
 JSN_ASSET_UPLOADED="${G}/asset_uploaded.json"
 #DEPLOYMENTS
@@ -210,21 +209,18 @@ case "$REQUEST" in
   outFile="${JSN_BRANCH}"
   ;;
   create-branch-from-current-issue)
-  params=( )
+  params=( branchName )
   $verbose && branchInfo
   branchIsMaster ||  exit
-  BRANCH_SELECTED=$(
-  echo "$(<${JSN_ISSUE})" | \
-      jq -r -c '"\(.labels[0].name)-\(.number)-\(.title)"' | \
-      sed 's/\s/-/g'
-  )
+  BRANCH_SELECTED=$1
   $verbose  && echo "${BRANCH_SELECTED}"
   parseBranchName "${BRANCH_SELECTED}" || exit
   omCreateBranch || exit
-  method='GET'
-  requestURL="${REPO_BRANCHES_URL}/${BRANCH_SELECTED}"
-  outFile="${JSN_BRANCH}"
-  expectResponse=200
+  # method='GET'
+  # requestURL="${REPO_BRANCHES_URL}/${BRANCH_SELECTED}"
+  # outFile="${JSN_BRANCH}"
+  # expectResponse=20
+  exit
   ;;
   select-issue-for-branch)
   params=( )
@@ -381,8 +377,8 @@ case "$REQUEST" in
   expectResponse=201
   ;;
   patch-issue)
-  params=( )
-  ISSUE_NUMBER="$(echo "$(<${JSN_ISSUE})" | jq '.number')"
+  params=( number )
+  ISSUE_NUMBER="$1"
   parseIssueMD
   omSetJsonFromIssueMD 'jsn'
   $verbose && echo "${jsn}" | jq '.'
@@ -528,10 +524,9 @@ EOF
   expectResponse=201
   ;;
   get-pull-request)
-  params=(number)
+  params=( url  )
   method='GET'
-  baseURL="${REPO_PULLS_URL}"
-  requestURL="${baseURL}/${1}"
+  requestURL="${1}"
   outFile="${JSN_PULL_REQUEST}"
   ;;
   get-current-pull-request)
@@ -587,7 +582,7 @@ EOF
   requestURL="${PR_URL}/merge"
   outFile="${JSN_MERGE}"
   expectResponse=200
-  thenDo='merged-pull-request'
+  # thenDo='merged-pull-request'
   ;;
   parse-merged)
   params=( )
@@ -812,6 +807,7 @@ EOF
   ;;
   list-releases)
   params=( )
+  gh get-releases
   jsnRELEASES=$(<${JSN_RELEASES})
   echo "${jsnRELEASES}" | jq -r -c '.[] | [ .tag_name , .name , .id ] '
   exit
@@ -828,6 +824,12 @@ EOF
   parseLatestRelease
   exit
   ;;
+  latest-release-tag)
+  params=( )
+  parseLatestRelease
+  echo ${RELEASE_TAG_NAME}
+  exit
+  ;;
   update-semver)
   params=( semver strategy )
   omSemVer $1 $2
@@ -840,7 +842,7 @@ EOF
   $verbose && echo "body: [ ${3} ]"
   method='POST'
   requestURL="${REPO_RELEASES_URL}"
-  outFile="${JSN_RELEASE}"
+  outFile="${JSN_LATEST_RELEASE}"
   jsn="{\"tag_name\":\"${1}\",\"target_commitish\":\"master\",\"name\":\"${2}\",\"body\":${3},\"draft\":false,\"prerelease\":false}"
   echo "${jsn}" | jq '.'
   expectResponse=201
@@ -864,10 +866,29 @@ EOF
   ;;
   parse-release)
   params=( )
-  parseRelease
+  gh get-latest-release
+  parseLatestRelease
   exit
   ;;
-#RELEASE ASSETS
+  #RELEASE ASSETS
+  info-asset-download-url)
+  params=( )
+  parseLatestRelease
+  echo $ASSET_BROWSER_DOWNLOAD_URL
+  exit
+  ;;
+  info-asset-download-count)
+  params=( )
+  parseLatestRelease
+  echo $ASSET_DOWNLOAD_COUNT
+  exit
+  ;;
+  info-release-tag-name)
+  params=( )
+  parseLatestRelease
+  echo $RELEASE_TAG_NAME
+  exit
+  ;;
   upload-release-asset)
   params=( uploadFile uploadURL contentType )
   method='UPLOAD'
@@ -884,8 +905,9 @@ EOF
   ;;
   list-assets)
   params=( )
+  gh get-releases
   jsnRELEASES="$(<${JSN_RELEASES})"
-  echo "${jsnRELEASES}" | jq -r '.[].assets[] |  [.name , .id , .url] '
+  echo "${jsnRELEASES}" | jq -r '["name", "id", "url"],(.[].assets[] | [.name, .id, .url]) | @sh'
   exit
   ;;
   delete-asset)
@@ -937,7 +959,7 @@ EOF
  ;;
 esac
 
-echo "INFO! - *requestURL*: [ ${requestURL} ]"
+$verbose && echo "INFO! - *requestURL*: [ ${requestURL} ]"
 # if the query has not got correct params then exit
 if [[ "${#params[@]}" -ne "${#ARGS[@]}" ]] ; then
   if [[ "${#params[@]}" -eq 0 ]] ; then

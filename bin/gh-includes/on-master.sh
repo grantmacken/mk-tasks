@@ -44,8 +44,8 @@ if [ -z  "${chk}" ] ;  then
   # NOTE: we don't have to do this strait away
   # We can make commits an push later on
   # By pushing we are making local commits public
-  echo "TASK! push to remote set upstream to branch isolated from master"
-  git push -u origin ${BRANCH_SELECTED}
+  # echo "TASK! push to remote set upstream to branch isolated from master"
+  # git push -u origin ${branch_selected}
   #todo check if upstream then return
   return 0
 else
@@ -472,13 +472,13 @@ local semverMinor=$( cut -d'.' -f2 <<<  ${v} )
 local semverPatch=$( cut -d'.' -f3 <<<  ${v} )
 local currentVer="v${semverMajor}.${semverMinor}.${semverPatch}"
 case "${2}" in
-  strategy-patch)
+  patch)
   newVer="v${semverMajor}.${semverMinor}.$((semverPatch + 1))"
   ;;
-  strategy-minor)
+  feature)
   newVer="v${semverMajor}.$((semverMinor + 1)).0"
   ;;
-  strategy-major)
+  major)
   newVer="v$((semverMajor + 1)).0.0"
   ;;
   *)

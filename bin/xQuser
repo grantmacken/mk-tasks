@@ -1,29 +1,51 @@
 #!/bin/bash +x
 ####################
-# if [ $# -ne 1 ]; then
-#     echo  $0: usage: requires 1 param [ file ]
-#     exit 1
-# fi
-verbose=false
 [ ! -e "config" ] &&  exit
-source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
 [ ! -e "../common.properties" ] &&  exit
-source ../common.properties
 [ ! -e "../project.properties" ] &&  exit
-source ../project.properties
 
-function saxonQuery(){
-java -cp $SAXON \
-  net.sf.saxon.Query \
-  \!method=text \
-  -qversion:3.0 \
-  -qs:"${1}"
-}
+source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+if [ -z "$NAME" ] ; then
+  exit
+fi
+source "../common.properties"
+source "../project.properties"
+
+verbose=false
+host='127.0.0.1'
+options=()
+while getopts vr OPTION
+do
+  case $OPTION in
+    v)
+      verbose=true
+      shift
+      ;;
+    r)
+      host=$( host ${GIT_REPO_NAME} | grep -oP '([0-9]{1,3}\.){3}[0-9]{1,3}' )
+      shift
+      ;;
+    *)
+      ;;
+  esac
+done
 
 function echoERR() {
   printf "%s\n" "$*" >&2;
 }
 
+if [ -z ${host} ] ; then
+  echo 'can not resolve host'
+  host='120.138.22.92' 
+fi
+
+endpoint="http://${host}:8080/exist/rest/db"
+$verbose  && echo "endpoint [ ${endpoint} ]"
+auth="admin:${GITHUB_ACCESS_TOKEN}"
+$verbose  && echo "auth [ ${auth} ]"
+contentType='Content-Type: application/xml'
+$verbose  && echo "content-type[ ${contentType} ]"
+$verbose  && echo "auth[ ${auth} ]"
 max='1'
 postData="$(
 cat <<EOF
@@ -39,6 +61,10 @@ declare option output:media-type 'text/plain';
 declare option output:item-separator '&#10;';
 declare option output:encoding 'UTF-8';
 (
+'eXist version: ' ||  system:get-version() || '&#10;' ,
+'eXist home:    ' ||  system:get-exist-home() || '&#10;' ,
+'free memory:   ' || system:get-memory-free() || '&#10;' ,
+'date time      ' ||  util:system-dateTime() || '&#10;' ,
 if(not(sm:user-exists('${GIT_USER}'))) then (sm:create-account('${GIT_USER}','${GITHUB_ACCESS_TOKEN}','dba')) else (),
 if(sm:user-exists('${GIT_USER}')) then ('${GIT_USER} account enabled: ' || sm:is-account-enabled('${GIT_USER}') || '&#10;') else (),
 if(sm:user-exists('${GIT_USER}')) then ('${GIT_USER} is dba: ' || sm:is-dba('${GIT_USER}') || '&#10;') else (),
@@ -52,17 +78,8 @@ if(sm:user-exists('${GIT_USER}')) then ('${GIT_USER} groups: ' || string-join( s
 </query>
 EOF
 )"
+
 $verbose  && echo "${postData}"
-
-endpoint="http://localhost:8080/exist/rest/db"
-# $verbose  && echo "endpoint [ ${endpoint} ]"
-auth="admin:${GITHUB_ACCESS_TOKEN}"
-# $verbose  && echo "auth [ ${auth} ]"
-contentType='Content-Type: application/xml'
-
-$verbose  && echo "content-type[ ${contentType} ]"
-$verbose  && echo "auth[ ${auth} ]"
-$verbose  && echo "content-type[ ${postData} ]"
 
 curl -s \
  -u "$auth" \
@@ -71,9 +88,3 @@ curl -s \
  $endpoint
 
 
-# 'groups: ' ||  string-join( sm:list-groups(), ', ' ) || '&#10;' ,
-# 'users: ' ||  string-join( sm:list-users(), ', ' ) || '&#10;',
-
-#  'users: ' || \$users || \$nl 
-# let \$groups := sm:list-groups()
-#  'groups: ' || \$groups || \$nl \

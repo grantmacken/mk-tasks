@@ -1,13 +1,13 @@
 <!--
 
 -->
-#Using mk-tasks
+# USING MK-TASKS
 
 All make commands are called in the root of your web project
 
 `cd ~/projects/grantmacken/gmack.nz`
 
-- [repo tasks](repo.md)
+ [repo tasks](repo.md)
 
 
 

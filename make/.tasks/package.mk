@@ -48,7 +48,7 @@ pack3:
 	@echo "$${collectionXconf}" | tidy -q -xml -utf8 -e  --show-warnings no
 	echo "$${collectionXconf}" > $(B)/collection.xconf
 
-pack:
+package:
 	@$(MAKE) --silent pack1
 	@$(MAKE) --silent pack2
 	@$(MAKE) --silent pack3
