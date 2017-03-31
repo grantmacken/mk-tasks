@@ -140,9 +140,12 @@ if [ "$REQUEST"  = 'get-repo' ]
 then
   echo "INFO! get the repo before any other calls"
   REPO_URL="${REPO_BASE_URL}/repos/${GIT_REPO_FULL_NAME}"
+  echo "REPO_URL: [ ${REPO_URL} ]"
 else
- [ -e ${G}/repo.json ]  || {
-  echo "FAILURE! no file ${JSON_REPO}"
+ [ -e  ${JSN_REPO} ]  || {
+  echo "no repo file: ${JSN_REPO}"
+  echo "fetching now ..."
+  gh get-repo
   exit 1
   } && {
   parseRepo || exit 1
@@ -366,7 +369,6 @@ case "$REQUEST" in
   ;;
   create-issue)
   params=( )
-  $verbose && echo "## $REQUEST ##"
   parseIssueMD > /dev/null
   omSetJsonFromIssueMD 'jsn'
   jsn=$(echo "${jsn}")
@@ -732,7 +734,7 @@ EOF
   get-pr-statuses)
   params=( )
   parsePullRequest
-  @verbose && echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
+  $verbose && echo "INFO! - *PR_STATUSES_URL*: [ ${PR_STATUSES_URL} ]"
   method='GET'
   requestURL="${PR_STATUSES_URL}"
   outFile="${JSN_PR_STATUSES}"

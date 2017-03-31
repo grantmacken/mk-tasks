@@ -58,6 +58,8 @@ gh picked-milestone ${answer}
 }
 
 function inputPrompt(){
+# CLR_INPUT=$'\e[0;33m'
+# CLR_RESET=$'\e[m'
 local rtrn="${1}"
 local ask="${2}"
 local string=

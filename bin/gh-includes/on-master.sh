@@ -57,38 +57,6 @@ $verbose && git branch -vv
 return 0
 }
 
-function omNewIssueMD(){
-cat << EOF
-  A branch always associated with issue so CURRENT_ISSUE.md repesents the issue
-  currently being worked on as a branch
-EOF
-inputPrompt 'ISSUE_TITLE' 'enter short descriptive' || return 1
-echo "INFO! - *ISSUE_TITLE* [ ${ISSUE_TITLE} ]"
-omNewIssueLabel 'LABEL_SELECTED' || return 1
-omNewIssueMilestone 'MILESTONE_NUMBER'|| return 1
-#echo "INFO! - *MILESTONE_NUMBER* [ $MILESTONE_NUMBER ]"
-# inputPrompt 'ISSUE_SUMMARY' 'enter short one line'
-# echo "INFO!  *ISSUE_SUMMARY*: [ ${ISSUE_SUMMARY} ]"
-# inputPrompt 'ISSUE_TASK' 'enter first '
-# echo "INFO!  *ISSUE_TASK*: [ ${ISSUE_TASK} ]"
-## from choices create ${ISSUE_FILE}
-cat << EOF | tee ${ISSUE_FILE}
-<!--
-ISSUE_TITLE="${ISSUE_TITLE}"
-ISSUE_LABEL="${LABEL_SELECTED}"
-ISSUE_MILESTONE="${MILESTONE_NUMBER}"
--->
-${ISSUE_TITLE}
-
-- [ ] dummy task 1
-- [ ] dummy task 2
-
-EOF
-
-}
-
-
-
 ###############################################################################
 # ISSUE_LABEL
 # set a single label

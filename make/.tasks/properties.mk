@@ -7,7 +7,7 @@ GIT_REPO_OWNER_LOGIN := $(shell echo $(GIT_REPO_FULL_NAME) |cut -d/ -f1 )
 GITHUB_ACCESS_TOKEN := $(shell echo "$$(<../.github-access-token)")
 SITE_ACCESS_TOKEN := $(shell echo "$$(<../.site-access-token)")
 WEBSITE := https://$(GIT_REPO_NAME)
-HOST_REMOTE := $(shell dig @8.8.8.8 +short $(GIT_REPO_NAME))
+# HOST_REMOTE := $(shell dig @8.8.8.8 +short $(GIT_REPO_NAME))
 # REPO declared in ../common.properties
 # REPO_BASE_URL := https://api.github.com
 API_REPO="$(REPO_BASE_URL)/repos/$(GIT_REPO_FULL_NAME)"

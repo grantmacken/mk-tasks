@@ -9,7 +9,6 @@ define repoXML
   <type>application</type>
   <target>$(NAME)</target>
   <prepare>modules/pre-install.xq</prepare>
-  <prepare>modules/post-install.xq</prepare>
   <permissions user="$(OWNER)" group="$(OWNER)" mode="0775"/>
 </meta>
 endef

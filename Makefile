@@ -32,6 +32,7 @@ build:
 	@stow -t $(UP_TARG_DIR) properties
 	@stow -t $(UP_TARG_DIR) node
 	@$(foreach project,$(WEB_PROJECTS),stow -t $(UP_TARG_DIR)/$(project) make;)
+	@$(foreach project,$(WEB_PROJECTS), mkdir -p $(UP_TARG_DIR)/$(project)/{\.github/headers,\.github/etags,\.logs,\.tmp};)
 
 clean:
 	@stow -D -t  $(UP_TARG_DIR)/bin bin

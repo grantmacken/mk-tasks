@@ -42,10 +42,11 @@ cat <<EOF
  max='${max}'>
 <text><![CDATA[
 xquery version '3.1';
-if (
-  sm:get-permissions(xs:anyURI('${route}'))//@mode/string() eq '$2'
-  ) then ()
-else (sm:chmod(xs:anyURI('${route}'),'${mode}'))
+(
+if ( sm:get-permissions(xs:anyURI('${route}'))//@mode/string() eq '$2') then ()
+else (sm:chmod(xs:anyURI('${route}'),'${mode}')),
+
+)
 ]]></text>
 </query>
 EOF

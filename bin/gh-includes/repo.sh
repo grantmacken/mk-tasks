@@ -80,6 +80,9 @@ if [ -e ${eTagFile} ] ;then
     ${url}
     )
 fi
+  
+  # $verbose && echo "INFO! - *token* : [ ${GITHUB_ACCESS_TOKEN} ]"
+  # $verbose && echo "INFO! - *response* : [ ${doRequest} ]"
 
 case "${doRequest}" in
   200)

@@ -1,0 +1,87 @@
+#!/bin/bash +x
+####################
+[ ! -e config ] &&  exit
+# clean up config before read source
+sed -i '/^[[:space:]]*$/d;s/[[:space:]]*$//' config
+source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+[ ! -e "../common.properties" ] &&  exit
+source ../common.properties
+[ ! -e "../project.properties" ] &&  exit
+source ../project.properties
+# NOTE! xQuery matches uses regex 
+verbose=false
+while getopts "v" OPTION; do
+  case ${OPTION} in
+    v)
+      verbose=true
+      ;;
+    *)
+      ;;
+  esac
+done
+shift $((OPTIND -1))
+
+function echoERR() {
+  printf "%s\n" "$*" >&2;
+}
+
+route="xmldb:exist:///db/apps/${NAME}/modules/api/router.xqm"
+
+max='9'
+postData="$(
+cat <<EOF
+<query xmlns='http://exist.sourceforge.net/NS/exist'
+ start='1'
+ wrap='no'
+ max='${max}'>
+<text><![CDATA[
+xquery version '3.1';
+import module namespace xrest="http://exquery.org/ns/restxq/exist"
+ at "java:org.exist.extensions.exquery.restxq.impl.xquery.exist.ExistRestXqModule";
+xrest:register-module(xs:anyURI('${route}'))
+]]></text>
+</query>
+EOF
+)"
+$verbose  && echo "${postData}"
+
+endpoint="https://${NAME}/exist"
+$verbose  && echo "endpoint [ ${endpoint} ]"
+auth="Authorization: Bearer ${SITE_ACCESS_TOKEN}" 
+$verbose  && echo "auth [ ${auth} ]"
+contentType='Content-Type: application/xml'
+$verbose  && echo "content-type[ ${contentType} ]"
+
+curl --http1.1 \
+ -H "$auth" \
+ -H "$contentType" \
+ -d "$postData" \
+ $endpoint
+
+# max='9'
+# postData="$(
+# cat <<EOF
+# <query xmlns='http://exist.sourceforge.net/NS/exist'
+#  start='1'
+#  wrap='no'
+#  max='${max}'>
+# <text><![CDATA[
+# xquery version '3.1';
+# (
+# sm:get-permissions(xs:anyURI('/db/data/gmack.nz/docs/posts/n4jp1'))//@mode/string(),
+# sm:chmod(xs:anyURI('/db/data/gmack.nz/docs/posts/n4jp1'),'rwxrw-r--'),
+# xmldb:remove('/db/data/gmack.nz/docs/posts', 'n4jq1')
+# )
+# ]]></text>
+# </query>
+# EOF
+# )"
+# curl --http1.1 \
+#  -H "$auth" \
+#  -H "$contentType" \
+#  -d "$postData" \
+#  $endpoint
+
+
+# if ( sm:get-permissions(xs:anyURI('${route}'))//@mode/string() eq '$2') then ()
+# else (sm:chmod(xs:anyURI('${route}'),'${mode}')),

@@ -1,6 +1,5 @@
 #!/bin/bash +x
 ####################
-
 [ ! -e "config" ] &&  exit
 source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
 [ ! -e "../common.properties" ] &&  exit
@@ -9,7 +8,6 @@ source ../common.properties
 source ../project.properties
 
 echoERR() { printf "%s\n" "$*" >&2; }
-
 verbose=false
  # params=( file )
 ARGS_COUNT=$#
@@ -28,6 +26,11 @@ case $1 in
     shift
     ;;
   remove)
+    action=$1
+    # action="'remove ${GIT_REPO_NAME} : ', repo:remove('${GIT_REPO_NAME}'),'&#10;',"
+    shift
+    ;;
+  register)
     action=$1
     # action="'remove ${GIT_REPO_NAME} : ', repo:remove('${GIT_REPO_NAME}'),'&#10;',"
     shift
@@ -52,6 +55,12 @@ contentType='Content-Type: application/xml'
 $verbose  && echo "content-type[ ${contentType} ]"
 downloadurl=$( gh info-asset-download-url )
 version=$( echo "$( gh info-release-tag-name )" | sed 's/v//' )
+echo '--------------------------------------------------------'
+echo ' ## AVAILABLE ## ' 
+echo "- repo name:        [ ${GIT_REPO_NAME} ]"
+echo "- rep download url: [ ${downloadURL} ]"
+echo "- repo version:     [ ${version} ]"
+echo '--------------------------------------------------------'
 max='99'
 postData="$(
 cat <<EOF
@@ -62,11 +71,14 @@ cat <<EOF
 <text><![CDATA[
 xquery version '3.1';
 (
-'repo download url: ${downloadURL} &#10;' ,
-'repo name: ${GIT_REPO_NAME} &#10;' ,
-'repo version: ${version} &#10;' ,
-'repo root: ' || repo:get-root() || '&#10;' ,
-if( '${action}' eq 'list' ) then (  '${action} &#10;' )
+'eXist version:      [ ' || system:get-version() || ' ] &#10;' ,
+'server enviroment:  [ ' || environment-variable('SERVER') || ' ] &#10;' ,
+'repo app root: ' || repo:get-root() ||  '${GIT_REPO_NAME}' || '&#10;' ,
+'app available : [ ' || xmldb:collection-available( repo:get-root() || '${GIT_REPO_NAME}') || ' ] &#10;' ,
+'version on server: [ ',
+if( xmldb:collection-available( repo:get-root() || '${GIT_REPO_NAME}')) then (doc( repo:get-root() || '${GIT_REPO_NAME}'
+|| '/expath-pkg.xml' )/*/@version/string()) else (), ' ] &#10;' ,
+if( '${action}' eq 'list' ) then ()
 else if( '${action}' eq 'remove' ) then (
   let \$action := repo:remove('${GIT_REPO_NAME}')
   return  '${action} ${GIT_REPO_NAME} : ' || string(\$action) )
@@ -77,13 +89,24 @@ else (),
 '&#10;repo list:&#10;=========&#10;'  || \
   string-join(repo:list() , '&#10;' ) || '&#10;' ,
 '&#10;restxq uri:&#10;=========&#10;'  || \
- string-join( distinct-values( rest:resource-functions()//*/@xquery-uri/string() ) , '&#10;' ) || '&#10;' 
-)
+ string-join( distinct-values( rest:resource-functions()//*/@xquery-uri/string() ) , '&#10;' ) || '&#10;',
+'restXQ module: ' || repo:get-root() ||  '${GIT_REPO_NAME}/modules/api/router.xqm' , '&#10;', 
+'module available : ' || util:binary-doc-available( xs:anyURI(repo:get-root() || '${GIT_REPO_NAME}/modules/api/router.xqm')) || '&#10;',
+ 'List restXQ module local names&#10;=========&#10;'  || \
+  string-join(exrest:find-resource-functions(xs:anyURI(repo:get-root() ||
+  '${GIT_REPO_NAME}/modules/api/router.xqm'))//rest:identity/@local-name/string(),', ') ,
+ '&#10;')
 ]]></text>
 </query>
 EOF
 )"
 
+ # string-join( available-environment-variables(), '&#10;' ), '&#10;',
+ # exrest:dependencies(),'&#10;',
+ # exrest:missing-dependencies(),'&#10;',
+ # exrest:invalid-modules(),'&#10;',
+ # repo:get-root() ||  '${GIT_REPO_NAME}' || '/api/router.xqm','&#10;',
+ # exrest:find-resource-functions(  repo:get-root() ||  '${GIT_REPO_NAME}' || '/api/router.xqm' ),
 curl -s --http1.1 \
  -H "$auth" \
  -H "$contentType" \

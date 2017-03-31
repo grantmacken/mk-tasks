@@ -141,7 +141,7 @@ then
 else
   toReplace="^(${key}).*$"
   replaceWith="(${key})='${value}'"
-  sed i "s|toReplace|${replaceWith}/g"  ${file}
+  sed i "s|toReplace|${replaceWith}|g"  ${file}
 fi
 chk=$( grep "${key}='${value}'" ${file}  )
 if [ -n "${chk}" ] ; then
