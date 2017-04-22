@@ -22,7 +22,7 @@ SHORT_URL=$( echo "${doRequest}" | grep -oP 'Location: \K(.+)' )
 }
 
 function repoLists(){
-  REPO_LISTS=(milestones labels tags issues branches pulls releases )
+  REPO_LISTS=(milestones labels tags issues)
   for item in "${REPO_LISTS[@]}";
   do
   gh get-$item

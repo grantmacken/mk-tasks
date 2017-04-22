@@ -138,9 +138,9 @@ thenDo=
 
 if [ "$REQUEST"  = 'get-repo' ]
 then
-  echo "INFO! get the repo before any other calls"
+  $verbose && echo "INFO! get the repo before any other calls"
   REPO_URL="${REPO_BASE_URL}/repos/${GIT_REPO_FULL_NAME}"
-  echo "REPO_URL: [ ${REPO_URL} ]"
+  $verbose && echo "REPO_URL: [ ${REPO_URL} ]"
 else
  [ -e  ${JSN_REPO} ]  || {
   echo "no repo file: ${JSN_REPO}"
@@ -175,7 +175,7 @@ case "$REQUEST" in
   method='GET'
   requestURL="${REPO_URL}"
   outFile="${JSN_REPO}"
-  thenDo='get-repo-lists'
+  # thenDo='get-repo-lists'
   ;;
   info-repo)
   params=( )
@@ -517,7 +517,6 @@ EOF
   method='POST'
   requestURL="${REPO_PULLS_URL}"
   outFile="${JSN_PULL_REQUEST}"
-  prPriorPullRequest || exit
   parseFetchedIssue
   issueNumber=${FETCHED_ISSUE_NUMBER}
   issueHead=${CURRENT_BRANCH}
@@ -873,6 +872,14 @@ EOF
   exit
   ;;
   #RELEASE ASSETS
+  get-assets)
+  params=( url )
+  outFile="${JSN_ASSET_UPLOADED}"
+  method='GET'
+  requestURL="${1}"
+  expectResponse=200
+  outFile="${JSN_ASSET_UPLOADED}"
+  ;;
   info-asset-download-url)
   params=( )
   parseLatestRelease

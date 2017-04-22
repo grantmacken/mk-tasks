@@ -7,7 +7,7 @@ if [ $# -ne 2 ]; then
     exit 1
 fi
 
-verbose=false
+verbose=true
 
 [ ! -e "config" ] &&  exit
 source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
@@ -42,11 +42,8 @@ cat <<EOF
  max='${max}'>
 <text><![CDATA[
 xquery version '3.1';
-(
-if ( sm:get-permissions(xs:anyURI('${route}'))//@mode/string() eq '$2') then ()
-else (sm:chmod(xs:anyURI('${route}'),'${mode}')),
-
-)
+if ( sm:get-permissions(xs:anyURI('${route}'))//@mode/string() eq '${mode}' ) then ()
+else (sm:chmod(xs:anyURI('${route}'),'${mode}'))
 ]]></text>
 </query>
 EOF

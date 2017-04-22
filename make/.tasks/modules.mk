@@ -62,6 +62,7 @@ $(L)/modules/%.log: $(B)/modules/%.xqm
 	@[ -d @D ] || mkdir -p $(@D)
 	@echo 'Upload $(basename $@) to eXist'
 	@xQstore $< > $@
+	@xQperm $< 'rwxr-xr-x'
 	@echo "Uploaded eXist path: [ $$(cat $@) ]"
 
 $(L)/modules/%.log: $(B)/modules/%.xq

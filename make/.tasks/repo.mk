@@ -17,7 +17,7 @@ TASKS : make tasks that can be invoked in this repo
   - make issue: ...  creates a new issue on github
   - make branch ...  creates a branch with branch name based on issue 
   on branch
-  - make issue: ...  patch issue
+  - make issue-patch: ...  patch issue
 
  PULL REQUEST PHASE
   - pull-request
@@ -69,88 +69,88 @@ $(G)/repo.json:
 #######################
 # ISSUE WITH TASK LIST
 
-issue:
-	@echo "depending on context make or patch issue"
+issue: issue.json
+
+issue-prior:
+	@echo "## $@ ##"
+	@echo "update repo info"
+	@gh get-repo
 	@gh get-milestones
 	@gh get-labels
 	@gh get-tags
 	@echo "remote tag:   [ $(shell gh latest-tag) ]"
 	@gh get-latest-release
 	@echo "release tag:  [ $(shell gh latest-release-tag) ]"
-	@echo "branch tag:   [ $(shell git describe --abbrev=0 --tags) ]"
+	@echo "local tag:   [ $(shell git describe --abbrev=0 --tags) ]"
 	@echo "config semver [ $(SEMVER) ]"
-	@$(if $(isMaster),echo 'is on master: [ $(isMaster) ]',echo 'is on master: [ nope! ]')
+	@$(if $(isMaster),,echo 'is on master: [ $(isMaster) ]',echo 'is on master: [ nope! ]')
 	@if [[ '$(shell git describe --abbrev=0 --tags)' != '$(shell gh latest-tag)' ]] ;\
  then echo 'local tags need updating';fi
-	@$(if $(isMaster),$(MAKE) --silent issue-template,)
-	@$(if $(isMaster),$(MAKE) --silent issue-create,)
-	@$(if $(isMaster),$(MAKE) --silent branch,)
-
-issue-create:
-	@$(if $(isMaster),gh -v create-issue,)
-
-issue-patch: $(G)/issue.json
-	@echo "##[ $@ ]##"
-	gh get-milestones
-	gh get-labels
-	@echo 'issue number: [ $(shell cat $<  | jq '.number') ]'
-	@echo 'issue url: [ $(shell cat $<  | jq '.url') ]'
-	@echo 'milestone number: [ $(shell cat $<  | jq '.milestone.number') ]'
-	@gh patch-issue $(shell cat $<  | jq '.number')
-
-.PHONY: issue issue-patch  issue-create branch 
+	@$(if $(isMaster),echo 'is on master: [ $(isMaster) ]',echo 'is on master: [ nope! ]')
+	@$(MAKE) --silent issue-clean
 
 issue-clean:
 	@if [ -e issue.md ] ; then rm issue.md; fi
 	@$(call cleanFetched,issue)
+	@$(call cleanFetched,branch)
 
-issue-template: export issueTemplate:=$(issueTemplate)
-issue-template:
+issue.md: export issueTemplate:=$(issueTemplate)
+issue.md:
 	@echo "##[ $@ ]##"
-	@echo "$${issueTemplate}" > issue.md
+	@$(MAKE) --silent issue-prior
+	@echo "$${issueTemplate}" > $@
 	@read -p "enter issue title ➥ " title;\
- sed -i -r "s/^ISSUE_TITLE=.*/ISSUE_TITLE='$$title'/" issue.md;\
- sed -i -r "s/^WIP .*/WIP $$title/" issue.md;
-	cat issue.md
+ sed -i -r "s/^ISSUE_TITLE=.*/ISSUE_TITLE='$$title'/" $@;\
+ sed -i -r "s/^WIP .*/WIP $$title/" $@;
+	@cat $@
 
-branch: $(G)/issue.json
+issue.json: issue.md
 	@echo "##[ $@ ]##"
-	@$(if $(isMaster),echo 'is on master: [ $(isMaster) ]',)
-	@echo 'ISSUE_NUMBER: $(shell echo $$(< $(<)) | jq '.number')'
-	@echo "ISSUE_LABEL: $(shell echo $$(< $(<)) | jq '.milestone.title' )"
-	@echo 'ISSUE_TITLE: $(shell echo $$(< $(<)) | jq '.title')'
-	@$(if $(isMaster),\
- echo 'will become branch: [ $(shell echo $$(< $(<)) | jq -r -c '"\(.milestone.title)-\(.number)-\(.title)"' | sed 's/\s/-/g' )  ] ',)
-	$(if $(isMaster),\
- gh -v create-branch-from-current-issue \
- $(shell echo $$(< $(<)) | jq -r -c '"\(.milestone.title)-\(.number)-\(.title)"' | sed 's/\s/-/g' ),)
-	$(MAKE) --silent branch-tasks
+	@gh create-issue
+	@echo 'issue number: [ $(shell jq '.number' $@ ) ]'
+	@echo 'issue url: [ $(shell jq '.url' $@ ) ]'
+	@echo 'milestone number: [ $(shell jq '.milestone.number' $@ ) ]'
 
-branch-tasks:
-	@$(if $(isMaster),$(error  'need to be on a branch'),echo 'new branch tasks')
-	@echo "current branch:   [ $(CURRENT_BRANCH) ]"
-	@echo "   current tag:   [ $(shell git describe --abbrev=0 --tags | sed s/v// ) ]"
-	@echo '    remote tag:   [ $(shell git ls-remote --tags | grep -oP "refs/tags/\K.+" | tail -1 ) ]'
-	@echo "   release tag:   [ $(shell gh latest-tag) ]"
-	@echo " config semver:   [ $(SEMVER) ]"
-	@echo "       version:   [ $(VERSION) ]"
-# @echo "new semver [ $(shell gh update-semver $(shell gh latest-tag) $(shell echo $$(< $(<)) | jq '.milestone.title')) ]"
-# @if [[ '$(shell gh latest-tag)' = '$(shell git ls-remote --tags | grep -oP "refs/tags/v\K.+" | tail -1 )' ]] ; then\
-# echo 'OK! latest release tag same as remote';fi
+branch:
+	@echo "##[ $@ ]##"
+	@$(MAKE) --silent $(G)/branch.json
+	@$(MAKE) --silent branch-tasks
 
+issue-patch: $(G)/issue.json
+	@echo "##[ $@ ]##"
+	@echo 'issue number: [ $(shell jq '.number' $< ) ]'
+	@echo 'issue url: [ $(shell jq '.url' $< ) ]'
+	@echo 'milestone number: [ $(shell jq '.milestone.number' $< ) ]'
+	@gh patch-issue $(shell jq '.number' $< )
 
-# @echo "TASK! update config semver for our new build"
-# @echo "new semver [ $(shell gh update-semver $(SEMVER) $(shell echo $$(< $(<)) | jq '.milestone.title')) ]"
-# @sed -i -r "s/^SEMVER=.*/SEMVER=$(shell gh update-semver $(SEMVER) $(shell echo $$(< $(<)) | jq '.milestone.title'))/" config
-# @git push -u origin $(CURRENT_BRANCH)
+.PHONY: issue issue-patch branch 
 
-# @if [[ '$(shell git describe --abbrev=0 --tags)' != '$(shell gh latest-tag)' ]] ;\
-# then echo 'local tags need updating';fi
-# @if [[ '$(shell git describe --abbrev=0 --tags)' != '$(shell gh latest-tag)' ]] ;\
-# then \
-# echo 'pull tags from remote';\
-# git pull --tags;\
-# fi
+$(G)/branch.json: $(G)/issue.json
+	@echo "##[ $@ ]##"
+	@$(if $(isMaster),echo 'is on master: [ $(isMaster) ]', false)
+	@echo 'ISSUE_NUMBER: $(shell jq '.number' $< )'
+	@echo "ISSUE_LABEL: $(shell jq '.milestone.title' $< )"
+	@echo 'ISSUE_TITLE: $(shell jq '.title' $< )'
+	@echo 'ISSUE_TITLE: $(shell jq '.title' $< )'
+	@echo '$(shell git branch | grep -oP master)' 
+	@git branch | grep -q $(shell jq -r -c '"\(.milestone.title)-\(.number)-\(.title)"' $< | sed 's/\s/-/g') && \
+ echo 'ERROR! branch already exists'; false || \
+ echo 'will become branch: [ $(shell jq -r -c '"\(.milestone.title)-\(.number)-\(.title)"' $< | sed 's/\s/-/g')  ]'
+	@git checkout -b $(shell jq -r -c '"\(.milestone.title)-\(.number)-\(.title)"' $< | sed 's/\s/-/g')  origin/master
+	@git push
+	@gh get-branch $(shell jq -r -c '"\(.milestone.title)-\(.number)-\(.title)"' $< | sed 's/\s/-/g')
+	@git branch -r
+	@git branch -vv
+	@echo "pull remote tags down"
+	@git pull --tags
+	@echo  'latest-tag [  $(shell gh latest-tag) ]'
+	@echo  'milestone title [  $(shell  jq '.milestone.title' $(G)/issue.json ) ]'
+	@echo "INFO! semver based on latest stragegy[ $(shell gh update-semver $(shell gh latest-tag) $(shell jq '.milestone.title' $(G)/issue.json )) ]"
+	@echo "TASK! update config semver for our new build"
+	@sed -i -r "s/^SEMVER=.*/SEMVER=$(shell gh update-semver $(shell gh latest-tag) $(shell jq '.milestone.title' $(G)/issue.json ))/" config
+	@git commit -am 'updated semver based on latest stragegy'
+	@echo  'branch name [  $(shell jq '.name' $@) ]'
+
 ###############################################################################
 # PULL REQUEST PHASE
 #  - pull-request
@@ -160,9 +160,33 @@ branch-tasks:
 ###############################################################################
 
 pr:
-	@$(MAKE) pull-request
-	@$(MAKE) pr-shipit
-	@$(MAKE) pr-status
+	@$(if $(isMaster),$(error  'need to be on a branch'),echo '## Create Pull Request ##')
+	@echo "current branch:   [ $(CURRENT_BRANCH) ]"
+	@echo " config semver:   [ $(SEMVER) ]"
+	@echo "last release tag: [ $(shell gh latest-tag) ]"
+	@echo "release strategy: [ $(shell jq '.milestone.title' $(G)/issue.json ) ]"
+	@echo "this release tag  [ $(shell gh update-semver $(shell gh latest-tag) $(shell jq '.milestone.title' $(G)/issue.json )  ) ]"
+	@if [ '$(shell gh update-semver $(shell gh latest-tag) $(shell jq '.milestone.title' $(G)/issue.json ))' !=  '$(SEMVER)' ] ;\
+ then \
+ echo 'update semver';\
+ sed -i -r "s/^SEMVER=.*/SEMVER=$(shell gh update-semver $(shell gh latest-tag) $(shell jq '.milestone.title' $(G)/issue.json ))/" config;\
+ git commit -am 'update semver'; \
+ git push; \
+ fi
+	@echo "make sure build up to date"
+	@$(MAKE) -silent build
+	@$(MAKE) -silent pull-request
+	@$(MAKE) -silent pr-shipit
+	@$(MAKE) -silent pr-status
+
+merge-ready:
+	@echo '## $@ ##'
+	@echo "Issue Number: [ $(shell jq '.number' $(G)/issue.json) ]"
+	@gh get-issue $(shell jq '.number' $(G)/issue.json)
+	gh get-pr-combined-status
+	@echo "Issue has pull request: [ $(shell jq 'has("pull_request")' $(G)/issue.json) ]"
+	@echo "Issue State: [ $(shell jq '.state' $(G)/issue.json) ]"
+	@echo "Combined State: [ $(shell jq '.state' $(G)/pr-combined-status.json ) ]"
 
 .PHONY: pr pull-request 
 
@@ -170,10 +194,21 @@ pr-shipit: $(G)/pr-comment.json
 
 pr-status: $(G)/pr-combined-status.json  
 
+gitStatus != git status -s --porcelain
+
 pull-request:
 	@echo '## $@ ##'
+	@echo '  conditions '
+	@echo '--------------'
+	@$(if $(gitStatus) , $(error 'git status should be clean' ) , echo ' - git status clean')
+	@echo "Issue Number: [ $(shell jq '.number' $(G)/issue.json ) ]"
+	@gh get-issue $(shell jq '.number' $(G)/issue.json )
+	@echo "Issue State: [ $(shell jq '.state' $(G)/issue.json ) ]"
+	@echo "Issue has pull request: [ $(shell jq 'has("pull_request")' $(G)/issue.json ) ]"
+	@if [ ! $(shell jq 'has("pull_request")' $(G)/issue.json ) ] ; then echo 'should be false'; false ;fi
 	@gh create-pull-request
 	@echo "-----------------------------------"
+
 
 $(G)/pr-comments.json:  $(G)/pull-request.json
 	@echo "##[ $@ ]##"
@@ -182,7 +217,7 @@ $(G)/pr-comments.json:  $(G)/pull-request.json
 
 $(G)/pr-comment.json: $(G)/pr-comments.json
 	@echo "{{{##[ $@ ]##"
-	@eval $(echo "$$(< $<)" | jq -r '. | length == 0') &&\
+	@eval $( jq -r '. | length == 0' $<  ) &&\
  gh create-pr-shipit-comment &&  gh get-pr-comments
 
 # $(if $(shell echo "$$(<$(JSN_PR_COMMENTS))" | jq '. | length == 0' | @sh ),true)
@@ -235,63 +270,56 @@ $(G)/pr-combined-status.json: $(G)/pr-status.json
 
 $(G)/merge.json: $(G)/pr-combined-status.json
 	@echo "##[ $@ ]##"
-	@echo '$(call cat,$<)' | jq '.'
+	@jq '.' <(<$<)
 	@echo "if conditions not meet fail. below will eval to true or false "
 	@echo 'successful state ' \
- $$( echo '$(call cat,$<)' | jq '.state == "success"')
+ $$( jq '.state == "success"' $< )
 	@echo 'statuses array with success state' \
- $$( echo '$(call cat,$<)' | jq '.statuses | .[] | contains({"state":"success"})')
+ $$( jq '.statuses | .[] | contains({"state":"success"})' $< )
 	@echo 'statuses with all good description ' \
- $$( echo '$(call cat,$<)' | jq 'contains({statuses: [{"description": "All good"}]})')
+ $$( jq 'contains({statuses: [{"description": "All good"}]})' $< )
 	@echo 'both successful state and all good' \
- $$( echo '$(call cat,$<)' | jq '(.state == "success") and (contains({statuses: [{"description": "All good"}]}))')
-	@eval $$( echo '$(call cat,$<)' | jq '.state == "success"')
-	@eval $$( echo '$(call cat,$<)' | jq '.statuses | .[] | contains({"state":"success"})')
-	@eval $$( echo '$(call cat,$<)' | jq 'contains({statuses: [{"description": "All good"}]})')
-	@eval $$( echo '$(call cat,$<)' | jq '(.state == "success") and (contains({statuses: [{"description": "All good"}]}))')
+ $$( jq '(.state == "success") and (contains({statuses: [{"description": "All good"}]}))' $< )
+	@eval $$( jq '.state == "success"' $< )
+	@eval $$( jq '.statuses | .[] | contains({"state":"success"})' $< )
+	@eval $$( jq 'contains({statuses: [{"description": "All good"}]})' $< )
+	@eval $$( jq '(.state == "success") and (contains({statuses: [{"description": "All good"}]}))' $< )
 	@echo "pull request combined status all ready to merge"
 	@gh merge-pull-request
+	@cat $@ | jq '.'
+
+.PHONY: merged  merge
 
 merge:
+	@gh info-pr-merge-state
 	@make --silent $(G)/merge.json
+	@echo 'update json pr status docs'
+	@gh info-pr-merge-state
 	@echo 'post merge tasks'
 	@echo '---------------'
 	@echo ' the pull request should now have a merged true status'
-	@echo "pull request url: [ $(shell cat .github/pull-request.json | jq '.url') ]"
-	@gh get-pull-request  $(shell cat .github/pull-request.json | jq '.url')
-	@echo "pull request merged: [ $(shell cat .github/pull-request.json | jq '.merged') ]"
-	@eval $$( cat .github/pull-request.json | jq '(.merged == true)')
+	@eval $$( jq '(.merged == true)' $(G)/pull-request.json )
 	@echo "latest tag: [ $$(gh latest-tag) ]"
 	@echo "    semver: [ $(SEMVER) ]" 
 	@echo 'latest milestone: ' $$(gh latest-milestone)
-	@echo "head ref: [ $(shell cat .github/pull-request.json | jq '.head.ref') ]"
-	@echo "checkout master: [ $(shell cat .github/pull-request.json | jq '.base.ref') ]"
-	@$(if $(isMaster),,git checkout $(shell cat .github/pull-request.json | jq '.base.ref'))
-	@$(MAKE) --silent back-on-master
+	@echo "head ref: [ $(shell jq '.head.ref' $(G)/pull-request.json ) ]"
+	@echo "checkout master: [ $(shell jq '.base.ref'  $(G)/pull-request.json ) ]"
+	@$(if $(isMaster),,git checkout $(shell jq '.base.ref' $(G)/pull-request.json))
 
-back-on-master:
-	@echo "delete local branch: $(shell cat .github/pull-request.json | jq '.head.ref') "
-	@$(if $(isMaster),git branch -D  $(shell cat .github/pull-request.json | jq '.head.ref') ,)
-	@echo "delete remote branch: $(shell cat .github/pull-request.json | jq '.head.ref') "
-	@$(if $(isMaster),git push origin --delete  $(shell cat .github/pull-request.json | jq '.head.ref') ,)
-	@echo "update deploy build "
-	@$(MAKE) --silent build
-
-# @if [ -e $(G)/pull-request.json ] ; then rm $(G)/pull-request.json; fi
-# @if [ -e $(G)/headers/pull-request.txt ] ; then rm $(G)/headers/pull-request.txt; fi
-# @if [ -e $(G)/etags/pull-request.etag ] ; then rm $(G)/etags/pull-request.etag; fi
-# @if [ -e $(G)/etags/pull-request.etag ] ; then rm $(G)/etags/pull-request.etag; fi
-
-.PHONY: merged back-to-master
-
-
-# @gh update-semver  $$(gh latest-tag)  $$(gh latest-milestone)
-# @gh update-semver  $$(gh latest-tag)  $$(gh latest-milestone)
-# @sed -i -r "s/^SEMVER=.*/SEMVER=$$(gh update-semver $$(gh latest-tag) $$(gh latest-milestone))/" config
-# @$(MAKE) build
-# @$(MAKE) package
-# @$(MAKE) release
-# @$(MAKE) upload
+merged: 
+	@echo "##[ $@ ]##"
+	@$$(jq -e '.merged' $(G)/merge.json) && jq '.message' $(G)/merge.json
+	@echo  'Pull Request URL [ $(shell jq '.url' $(G)/pull-request.json ) ]'
+	@gh get-pull-request $(shell jq '.url' $(G)/pull-request.json)
+	@echo 'Pull Request state     [ $(shell jq '.state' $(G)/pull-request.json ) ]'
+	@echo 'Pull Request merged    [ $(shell jq '.merged' $(G)/pull-request.json ) ]'
+	@echo 'Pull Request closed at [ $(shell jq '.closed_at' $(G)/pull-request.json ) ]'
+	@echo 'Pull Request merged at [ $(shell jq '.merged_at' $(G)/pull-request.json ) ]'
+	@$$( jq -e '.merged' $(G)/pull-request.json )
+	@echo "delete local branch: $(shell jq '.head.ref' $(G)/pull-request.json ) "
+	@$(if $(isMaster),git branch -D  $(shell  jq '.head.ref'  $(G)/pull-request.json ) ,)
+	@echo "delete remote branch: $(shell jq '.head.ref' $(G)/pull-request.json  ) "
+	@$(if $(isMaster),git push origin --delete  $(shell jq '.head.ref' $(G)/pull-request.json ) ,)
 
 # }}}
 ###############################################################################
@@ -313,48 +341,45 @@ back-on-master:
 
 #release: $(G)/tags.json
 
-release: $(G)/latest-release.json
-
-upload: $(G)/asset_uploaded.json
+release:
+	@echo '##[ $@ ]##'
+	@echo "last release tag: [ $(shell gh latest-tag) ]"
+	@echo "release strategy: [ $(shell jq '.milestone.title' $(G)/issue.json ) ]"
+	@echo "this release tag  [ $(shell gh update-semver $(shell gh latest-tag) $(shell jq '.milestone.title' $(G)/issue.json )  ) ]"
+	@echo "make sure build up to date"
+	@$(MAKE) -silent build
+	$(MAKE) $(G)/asset_uploaded.json
 
 $(G)/latest-release.json: $(XAR)
 	@echo '##[ $@ ]##'
 	@echo 'create release using following params'
 	@echo 'tag-name: v$(VERSION)'
 	@echo 'name: $(ABBREV)-$(VERSION)'
-	@echo 'body: $(shell echo $$(<$(G)/pull-request.json) | jq '.body')'
+	@echo 'body: $(shell jq '.body' $(G)/pull-request.json )'
 	@echo 'xar: $(wildcard $(XAR))'
-	@gh -v create-release 'v$(VERSION)' '$(ABBREV)-$(VERSION)' '$(shell echo $$(<$(G)/pull-request.json) | jq ".body")'
+	@gh -v create-release 'v$(VERSION)' '$(ABBREV)-$(VERSION)' '$(shell jq ".body" $(G)/pull-request.json )'
 	@echo "------------------------------------------------------------------"
 
 # @gh create-release "v$(VERSION)" "$(ABBREV)-$(VERSION)" "$(shell echo $$(<$(G)/pull-request.json) | jq '.body | @sh')"
 
+upload-URL = '$(shell jq '.upload_url' <(<$(G)/latest-release.json ))'
+
 $(G)/asset_uploaded.json: $(G)/latest-release.json
-	@echo "{{{##[ $@ ]##"
-	@echo "tag-name: $(shell echo $$(<$(<)) | jq '.tag_name')"
-	@echo "name: $(shell echo $$(<$(<)) | jq '.name')"
+	@echo "##[ $@ ]##"
+	@echo "tag-name: [ $(shell jq -r '.tag_name' $< ) ]"
+	@echo "    name: [ $(shell jq '.name' $< ) ]" 
 	@echo 'upload release using following params'
 	@echo "upload-file: $(XAR)"
-	@echo "------------------------------------------------------------------ "
-	@echo "upload-url:"
-	@echo "$$(echo $$(<$(<)) | jq '.upload_url' | sed -r 's/\{.+//g')?name=$(notdir $(XAR))"
-	@echo "------------------------------------------------------------------ "
+	@echo 'upload-url: [$(shell jq -r '.upload_url' $< | sed -r 's/\{.+//g' )  ]'
 	@echo "contentType: application/expath+xar"
-	@gh upload-release-asset \
- "$(XAR)" \
- "$(shell echo \"$$(echo $$(<$(<)) | jq '.upload_url' | sed -r 's/\{.+//g')?name=$(notdir $(XAR)))\")" \
- "application/expath+xar"
-	@gh get-latest-release
-	@echo "}}}"
+	 gh upload-release-asset \
+  '$(XAR)' \
+  '$(shell jq -r '.upload_url' $< | sed -r 's/\{.+//g' )?name=$(notdir $(XAR))' \
+  'application/expath+xar'
+	 @gh get-latest-release
+	 @jq '.' $@
+	 @echo "------------------------------------------------------------------ "
 
-# $(G)/tags.json: $(G)/latest-release.json
-# @echo "##[ $@ ]##"
-# @gh get-tags
-# @echo 'stash the updated config file'
-# @git stash
-# @echo 'Pull in tags'
-# @git pull --tags
-# @echo "------------------------------------------------------------------ "
 
 tag-semver-sync:
 	@sed -i -r "s/^SEMVER=.*/SEMVER=$$(gh latest-tag)/" config
@@ -399,30 +424,48 @@ tag-semver-sync:
 #  "$(shell echo $$(<) |\
 #  jq '.assets[0] | .browser_download_url' )"
 
-.PHONY: deploy  
+.PHONY: deploy  downloadCount
 
-ifneq ($(wildcard $(G)/latest-release.json),)
-releaseTagName != echo $$(<$(G)/latest-release.json) | jq '.tag_name'
-releaseName != echo $$(<$(G)/latest-release.json) | jq '.name'
-releaseDownloadUrl !=  echo $$(<$(G)/latest-release.json) | jq '.assets[0] | .browser_download_url'
-endif
+# ifneq ($(wildcard $(G)/latest-release.json),)
+# releaseTagName != echo $$(<$(G)/latest-release.json) | jq '.tag_name'
+# releaseName != echo $$(<$(G)/latest-release.json) | jq '.name'
+# releaseDownloadUrl !=  echo $$(<$(G)/latest-release.json) | jq '.assets[0] | .browser_download_url'
+# endif
+# me/gmack/projects/grantmacken/gmack.nz/.github/asset_uploaded.json' 
 
 repoDeploy:
+	@echo '           url: [ $(shell jq '.url' $(G)/asset_uploaded.json ) ]'
+	@echo '          name: [ $(shell jq '.name' $(G)/asset_uploaded.json ) ]'
+	@echo '  download url: [ $(shell jq '.browser_download_url' $(G)/asset_uploaded.json ) ]'
+	@echo 'download count: [ $(shell jq '.download_count' $(G)/asset_uploaded.json ) ]'
+	@echo '  content type: [ $(shell jq '.content_type' $(G)/asset_uploaded.json) ]'
+	@echo '   release tag: [ $(shell jq '.tag_name' $(G)/latest-release.json ) ]'
+	@gh get-assets $(shell jq -r '.url' $(G)/asset_uploaded.json )
+	@xQdeploy list
+	@xQdeploy install
+	@xQregister
+	@xQdeploy list
+	@gh get-assets $(shell jq -r '.url' $(G)/asset_uploaded.json ) && sleep 3
+	@$(MAKE) --silent downloadCount
+	@echo "------------------------------------------------------"
+
+downloadCount:
+	@echo 'download count: [ $(shell jq '.download_count' $(G)/asset_uploaded.json ) ]'
+
+
+repoDeployRemote:
 	@gh -v get-latest-release
 	@echo "download url: [ $(shell gh info-asset-download-url ) ]"
 	@echo "release tag name [ $(shell gh info-release-tag-name) ]"
 	@echo "download count: [ $(shell gh info-asset-download-count ) ]"
-	@echo "download count: [ $(shell gh info-asset-download-count ) ]"
-	@echo "$(shell xQdeploy install && xQdeploy list)"
+	@sudo make hostsRemote
+	@xQdeploy list
+	@xQdeploy install
+	@xQregister
+	@xQdeploy list
+	@sudo make hostsLocal
 	@gh get-latest-release
 	@echo "download count: [ $(shell gh info-asset-download-count ) ]"
-	@echo "------------------------------------------------------"
-
-# xQdeploy -v
-
-repoDeployVerbose:
-	@gh get-latest-release
-	@xQdeploy -v
 	@echo "------------------------------------------------------"
 
 repoUndeploy:
