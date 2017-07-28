@@ -1,0 +1,68 @@
+#!/bin/bash +x
+###############
+[ ! -e "config" ] &&  exit
+[ ! -e "../common.properties" ] &&  exit
+source ../common.properties
+[ ! -e "../project.properties" ] &&  exit
+source ../project.properties
+source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+if [ -z "$NAME" ] ; then
+  exit
+fi
+
+echo "$NAME" 
+endpoint="https://${NAME}/exist"
+$verbose  && echo "endpoint [ ${endpoint} ]"
+auth="Authorization: Bearer ${SITE_ACCESS_TOKEN}" 
+contentType='Content-Type: application/xml'
+max='99'
+postData="$(
+cat <<EOF
+<query xmlns='http://exist.sourceforge.net/NS/exist'
+ start='1'
+ wrap='no'
+ max='${max}'>
+<text><![CDATA[
+xquery version '3.1';
+let \$collection := '/db/data/' ||  '${GIT_REPO_NAME}'
+let \$targetPath := '${HOME}/projects/${GIT_REPO_FULL_NAME}/data'
+let \$preserveStructure := true()
+return
+(
+'eXist version:      [ ' || system:get-version() || ' ] &#10;' ,
+'server enviroment:  [ ' || environment-variable('SERVER') || ' ] &#10;',
+'data collection: ' ||  xmldb:collection-available(\$collection)  || '&#10;',
+'target path: ' || \$targetPath || ' - ' ||  file:is-directory(\$targetPath)  || '&#10;',
+if( not( file:is-directory( \$targetPath))) then ( file:mkdirs( \$targetPath ) ) else (),
+  file:sync(\$collection, \$targetPath,()),
+  xmldb:get-child-collections( \$collection  || '/media' ),
+  for-each( xmldb:get-child-collections( \$collection  || '/docs' ),
+    function( \$col ){
+    (
+    string( \$col ) || '&#10;',
+    for-each( xmldb:get-child-resources( \$collection  || '/docs/' || \$col ),
+      function( \$res ){(
+      \$collection  || '/docs/' || \$col || '&#10;',
+      string( \$res ) || '&#10;',
+      xmldb:remove( \$collection  || '/docs/' || \$col , \$res )
+      )})
+    )
+  }),
+  let \$seq := xmldb:store-files-from-pattern( \$collection , \$targetPath, '**/*', 'application/xml',\$preserveStructure )
+   return (
+     ' Store From File System into eXist ' || '&#10;',
+     '-----------------------------' || '&#10;',
+     for-each( \$seq ,function( \$str ){  ' - ' || \$str ||  '&#10;' })
+     )
+)
+]]></text>
+</query>
+EOF
+)"
+
+
+curl -s \
+ -H "$auth" \
+ -H "$contentType" \
+ -d "$postData" \
+ $endpoint

@@ -7,7 +7,7 @@ define repoXML
   <license>GNU-LGPL</license>
   <copyright>true</copyright>
   <type>application</type>
-  <target>$(NAME)</target>
+  <target>$(GIT_REPO_NAME)</target>
   <prepare>modules/pre-install.xq</prepare>
   <permissions user="$(OWNER)" group="$(OWNER)" mode="0775"/>
 </meta>
@@ -15,11 +15,11 @@ endef
 
 define expathPkgXML
 <package xmlns="http://expath.org/ns/pkg"
-  name="$(NAME)"
+  name="$(GIT_REPO_NAME)"
   abbrev="$(ABBREV)"
   spec="1.0"
   version="$(VERSION)">
-  <title>$(NAME)</title>
+  <title>$(GIT_REPO_NAME)</title>
 </package>
 endef
 

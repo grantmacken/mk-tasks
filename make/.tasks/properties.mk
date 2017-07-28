@@ -40,7 +40,13 @@ else
   TINY-LR_UP :=
 endif
 
-VERSION != echo "$(SEMVER)" | sed 's/v//'
+# determine version
+lastTag != if [ -e $(G)/tags.json ];then jq -r -c '.[0] | .name' $(G)/tags.json;fi
+gitTag != git describe --abbrev=0 --tags
+releaseStrategy != if [ -e $(G)/issue.json ] ; then jq '.milestone.title' $(G)/issue.json; fi
+nextTag !=  gh update-semver $(lastTag) $(releaseStrategy)
+
+VERSION != echo "$(nextTag)" | sed 's/v//'
 XAR != echo "$(D)/$(ABBREV)-$(VERSION).xar"
 CURRENT_DATE  != date "+%Y-%m-%d"
 CURRENT_DATE_TIME != date "+%Y-%m-%dT%H:%M:%S"

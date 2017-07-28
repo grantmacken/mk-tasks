@@ -41,6 +41,10 @@ UPLOAD_IMAGE_LOGS  := $(patsubst %.png,$(L)/%.log,$(SOURCE_IMAGES))
 # $(patsubst %.svg,$(L)/%.log,$(SOURCE_ICONS)) 
 #############################################################
 # https://www.imagemagick.org/script/escape.php
+# alternative use zopflipng 
+#@zopflipng -y -m --prefix $@
+# @if [ -e $(dir  $@)zopfli_$(basename $(notdir $@)).png  ] ;then \
+#  mv $(dir  $@)zopfli_$(basename $(notdir $@)).png $(@); fi
 
 images: $(L)/upImages.log
 
@@ -50,7 +54,10 @@ watch-images:
 .PHONY:  watch-images
 
 $(B)/resources/images/%.png: resources/images/%.png
-	@echo "## $@ ##"
+	@echo "## $(basename $@) ##"
+	@echo "## $(dir $@) ##"
+	@echo "## $(notdir $@) ##"
+	@echo "##  $(dir  $@)zopfli_$(basename $(notdir $@)).png ##"
 	@[ -d @D ] || mkdir -p $(@D)
 	@echo "SRC: [ $< ]"
 	@echo "Orginal Width: [ $$(identify -format '%w' $<) ]"

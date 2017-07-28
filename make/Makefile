@@ -7,6 +7,8 @@ export PATH := $(abspath ../bin):$(abspath ../node_modules/.bin):$(PATH)
 .SECONDARY:
 
 # Make sure we have the following apps installed:
+reachable != dig @8.8.8.8 +short github.com
+
 APP_LIST = git curl node tidy scour
 assert-command-present = $(if $(shell which $1),,$(error '$1' missing and needed for this build))
 $(foreach src,$(APP_LIST),$(call assert-command-present,$(src)))

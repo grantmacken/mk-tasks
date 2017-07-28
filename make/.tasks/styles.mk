@@ -54,11 +54,11 @@ $(B)/resources/styles/%.css.gz: resources/styles/%.css
 	@postcss \
  --use autoprefixer --autoprefixer.browsers "> 5%"\
  --use cssnano\
- --output $(T)/resources/styles/$*.css $< 2>/dev/null
+ --output $(T)/resources/styles/$*.css $< &&  echo 'shrinked with cssnano' || false
 	@echo "orginal size: [ $$(wc -c $< | cut -d' ' -f1) ]"
 	@echo "cssnano size: [ $$(wc -c $(T)/resources/styles/$*.css | cut -d' ' -f1) ]"
-	@zopfli $(T)/resources/styles/$*.css
-	@rm $(T)/resources/styles/$*.css 
+	@zopfli $(T)/resources/styles/$*.css &&  echo 'gziped with zopfli' || false
+	@[ -e $(T)/resources/styles/$(*).css ] && rm $(T)/resources/styles/$(*).css
 	@mv $(T)/resources/styles/$*.css.gz $@
 	@echo "gzip bld size: [ $$(wc -c $@ | cut -d' ' -f1) ]"
 	@echo '---------------------------------------------------'

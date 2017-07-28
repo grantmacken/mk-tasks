@@ -56,7 +56,7 @@
 
 1. `make issue 
 2.' make branch`
-2. `make sync-issue
+2. `make issue-patch
 3. `make pr`
 
 

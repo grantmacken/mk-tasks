@@ -28,41 +28,6 @@ function echoERR() {
 route="xmldb:exist:///db/apps/${NAME}/modules/api/router.xqm"
 
 max='99'
-postData="$(
-cat <<EOF
-<query xmlns='http://exist.sourceforge.net/NS/exist'
- start='1'
- wrap='no'
- max='${max}'>
-<text><![CDATA[
-xquery version '3.1';
-import module namespace dbutil="http://exist-db.org/xquery/dbutil";
-sm:get-permissions(xs:anyURI('/db/data/gmack.nz/docs/posts'))//@mode/string(),
-dbutil:scan-resources(xs:anyURI('/db/data/gmack.nz/docs/posts'),function(\$resource) {\$resource ||  '&#10;'}),
-dbutil:scan-resources(xs:anyURI('/db/data/gmack.nz/docs/posts'),\
-function(\$resource) {\
- xmldb:remove('/db/data/gmack.nz/docs/posts',substring-after( \$resource, '/posts/'))  \
-})
-]]></text>
-</query>
-EOF
-)"
-$verbose  && echo "${postData}"
-
-endpoint="https://${NAME}/exist"
-$verbose  && echo "endpoint [ ${endpoint} ]"
-auth="Authorization: Bearer ${SITE_ACCESS_TOKEN}" 
-$verbose  && echo "auth [ ${auth} ]"
-contentType='Content-Type: application/xml'
-$verbose  && echo "content-type[ ${contentType} ]"
-
-curl --http1.1 \
- -H "$auth" \
- -H "$contentType" \
- -d "$postData" \
- $endpoint
-
-# max='9'
 # postData="$(
 # cat <<EOF
 # <query xmlns='http://exist.sourceforge.net/NS/exist'
@@ -71,20 +36,55 @@ curl --http1.1 \
 #  max='${max}'>
 # <text><![CDATA[
 # xquery version '3.1';
-# (
-# sm:get-permissions(xs:anyURI('/db/data/gmack.nz/docs/posts/n4jp1'))//@mode/string(),
-# sm:chmod(xs:anyURI('/db/data/gmack.nz/docs/posts/n4jp1'),'rwxrw-r--'),
-# xmldb:remove('/db/data/gmack.nz/docs/posts', 'n4jq1')
-# )
+# import module namespace dbutil="http://exist-db.org/xquery/dbutil";
+# sm:get-permissions(xs:anyURI('/db/data/gmack.nz/docs/posts'))//@mode/string(),
+# dbutil:scan-resources(xs:anyURI('/db/data/gmack.nz/docs/posts'),function(\$resource) {\$resource ||  '&#10;'}),
+# dbutil:scan-resources(xs:anyURI('/db/data/gmack.nz/docs/posts'),\
+# function(\$resource) {\
+#  xmldb:remove('/db/data/gmack.nz/docs/posts',substring-after( \$resource, '/posts/'))  \
+# })
 # ]]></text>
 # </query>
 # EOF
 # )"
+# $verbose  && echo "${postData}"
+
+endpoint="https://${NAME}/exist"
+$verbose  && echo "endpoint [ ${endpoint} ]"
+auth="Authorization: Bearer ${SITE_ACCESS_TOKEN}" 
+$verbose  && echo "auth [ ${auth} ]"
+contentType='Content-Type: application/xml'
+$verbose  && echo "content-type[ ${contentType} ]"
+
 # curl --http1.1 \
 #  -H "$auth" \
 #  -H "$contentType" \
 #  -d "$postData" \
 #  $endpoint
+
+max='9'
+postData="$(
+cat <<EOF
+<query xmlns='http://exist.sourceforge.net/NS/exist'
+ start='1'
+ wrap='no'
+ max='${max}'>
+<text><![CDATA[
+xquery version '3.1';
+(
+xmldb:create-collection('/db/data/gmack.nz/docs', 'mentions'),
+sm:get-permissions(xs:anyURI('/db/data/gmack.nz/docs/mentions'))//@mode/string(),
+sm:chmod(xs:anyURI('/db/data/gmack.nz/docs/mentions'),'rwxrwxrwx')
+)
+]]></text>
+</query>
+EOF
+)"
+curl --http1.1 \
+ -H "$auth" \
+ -H "$contentType" \
+ -d "$postData" \
+ $endpoint
 
 
 # if ( sm:get-permissions(xs:anyURI('${route}'))//@mode/string() eq '$2') then ()

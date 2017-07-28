@@ -72,7 +72,6 @@ $(L)/modules/%.log: $(B)/modules/%.xq
 	@xQstore $< > $@
 	@echo "Uploaded eXist path: [ $$(cat $@) ]"
 
-
 $(L)/upModules.log: $(UPLOAD_MODULE_LOGS)
 	@$(MAKE) --silent $(UPLOAD_MODULE_LOGS)
 	@echo '' > $@ 
@@ -85,7 +84,9 @@ $(L)/upModules.log: $(UPLOAD_MODULE_LOGS)
 	@echo '----------------------------'
 	@cat $@
 	@echo '----------------------------'
-	@touch $(UPLOAD_MODULE_LOGS) 
+	@touch $(UPLOAD_MODULE_LOGS)
+
+#@$(MAKE) --silent modules-test
 
 modules-clean:
 	@rm $(L)/upModules.log
@@ -93,3 +94,8 @@ modules-clean:
 modules-touch:
 	@touch $(SRC_XQM)
 	@touch $(SRC_XQ)
+
+modules-test:
+	@echo "## $@ ##"
+	@prove -v - < t/modules.txt
+

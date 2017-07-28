@@ -1,0 +1,36 @@
+#!/bin/bash +x
+###############
+[ ! -e "config" ] &&  exit
+
+source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+if [ -z "$NAME" ] ; then
+  exit
+fi
+
+echo "$NAME" 
+HOST='127.0.0.1'
+while getopts "r" OPTION
+do
+  case $OPTION in
+    r)
+      HOST=$(dig @8.8.8.8 +short "$NAME")
+      shift
+      ;;
+    *)
+      ;;
+  esac
+done
+
+if grep -q "$NAME" /etc/hosts ; then
+  sudo sed -i "/$NAME/ s/.*/$HOST\t$NAME/g" /etc/hosts
+else
+   echo "$HOST  $NAME" | sudo tee -a /etc/hosts
+fi
+
+# grep -oP '([0-9]{1,3}\.){3}[0-9]{1,3}\s+\S+' /etc/hosts
+
+# nmap $NAME
+
+# curl -L -s -o /dev/null -w\
+#  "\n\tHTTP CODE:\t%{http_code}\n\tHTTP_VERSION:\t%{http_version}\n\tREMOTE_IP:\t%{remote_ip}\n\tLOCAL_IP:\t%{local_ip}\n"\
+#   https://$NAME

@@ -5,7 +5,29 @@ PROJECT OWNER: $(OWNER)
 CREATED BY: $(AUTHOR)
 DESCRIPTION: $(DESCRIPTION)
 ---------------------------------------------------------
-TASKS : make tasks that can be invoked in this repo 
+ mk-task are a bundle of calls to make targets which aim to
+ create a deployable eXist website app.
+
+source folders
+ - modules
+ - templates
+ - resources
+   - icons
+   - scripts
+   - styles
+
+workflow phases
+- building  -  async watch targets
+     -> lint | compile | optimise 
+     -> build folder - cleaned assets
+     -> up to eXist dev
+     -> functional tests | live reload
+- deploying
+  - xar -> github release asset ->  install and deploy xar into eXist prod and dev
+
+working with github api
+
+TASKS : make tasks that can be invoked in this repo
 
 - repo
 

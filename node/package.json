@@ -4,6 +4,8 @@
   "description": "my node modules",
   "private": "true",
   "devDependencies": {
+    "xqlint": "git://github.com/eXistSolutions/xqlint.git#exist-syntax",
+    "prettier": "latest",
     "autoprefixer": "latest",
     "cssfmt": "latest",
     "postcss-cssnext": "latest",

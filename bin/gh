@@ -9,6 +9,13 @@ if [ -z "$NAME" ] ; then
   exit
 fi
 
+isReachable="$( dig @8.8.8.8 +short github.com | grep -oP '^([0-9]{1,3}[\.]){3}[0-9]{1,3}$' | head -1 )"
+
+if [ -z "${isReachable}" ] ; then
+  echo 'Github is not reachable at the moment'
+  exit 1
+fi
+
 source "../common.properties"
 [ ! -d "${BIN_DIR}/gh-includes" ]  &&  exit
 # setup some common dirs
@@ -200,7 +207,7 @@ case "$REQUEST" in
   echo "$(<${JSN_BRANCHES})" | \
   jq -r '["name"],(.[] | [.name]) | @sh'
   exit
-	;;
+  ;;
   info-branch)
   branchInfo || exit
   exit
@@ -414,11 +421,12 @@ case "$REQUEST" in
   exit
   ;;
   get-issue)
-  params=(number)
+  params=( number )
   method='GET'
   baseURL="${REPO_ISSUES_URL}"
   requestURL="${baseURL}/${1}"
-  outFile="${JSN_ISSUE}"
+  outFile="${G}/issue.json"
+  expectResponse=200
   ;;
   close-issue)
   params=( number )
@@ -525,10 +533,11 @@ EOF
   expectResponse=201
   ;;
   get-pull-request)
-  params=( url  )
+  params=( url )
   method='GET'
   requestURL="${1}"
-  outFile="${JSN_PULL_REQUEST}"
+  outFile="${G}/pull-request.json"
+  expectResponse=200
   ;;
   get-current-pull-request)
   params=( )
@@ -565,23 +574,23 @@ EOF
   params=( )
   parsePullRequest > /dev/null
   echo "${PR_MERGED}"
-	exit
-	;;
+  exit
+  ;;
   merge-pull-request)
-  params=( )
-  gh 'get-current-pull-request' || exit
-  # gh 'get-pr-combined-status' || exit
-  # gh 'get-pr-commits' || exit
-  parsePullRequest > /dev/null
-  # parseCombinedStatus > /dev/null
-  # prPriorMerge || exit
-  #parsePullRequest
-  commitMessage="pull request merged #${PR_NUMBER}\ntitle - ${PR_TITLE}"
-  jsn="{\"commit_message\":\"${commitMessage}\", \"sha\":\"${PR_HEAD_SHA}\"}"
+  params=( url number title sha  )
+  #gh 'get-current-pull-request' || exit
+  ## gh 'get-pr-combined-status' || exit
+  ## gh 'get-pr-commits' || exit
+  #parsePullRequest > /dev/null
+  ## parseCombinedStatus > /dev/null
+  ## prPriorMerge || exit
+  ##parsePullRequest
+  commitMessage="pull request merged #${2}\ntitle - ${3}"
+  jsn="{\"commit_message\":\"${commitMessage}\", \"sha\":\"${4}\"}"
   echo "$jsn" | xq '.'
   method='PUT'
-  requestURL="${PR_URL}/merge"
-  outFile="${JSN_MERGE}"
+  requestURL="${1}/merge"
+  outFile="${G}/merge.json"
   expectResponse=200
   # thenDo='merged-pull-request'
   ;;

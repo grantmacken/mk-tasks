@@ -1,0 +1,130 @@
+#!/bin/bash +x
+###############
+[ ! -e "config" ] &&  exit
+[ ! -e "../common.properties" ] &&  exit
+source ../common.properties
+[ ! -e "../project.properties" ] &&  exit
+source ../project.properties
+source <( sed 's/=/="/g' config | sed -r 's/$/"/g' )
+if [ -z "$NAME" ] ; then
+  exit
+fi
+
+echo "${SSH}"
+hosts -r
+
+fsPath="${HOME}/projects/${GIT_REPO_FULL_NAME}/data"
+dbCollection="/db/data/${GIT_REPO_NAME}"
+
+endpoint="https://${NAME}/exist"
+auth="Authorization: Bearer ${SITE_ACCESS_TOKEN}" 
+contentType='Content-Type: application/xml'
+max='99'
+postData="$(
+cat <<EOF
+<query xmlns='http://exist.sourceforge.net/NS/exist'
+ start='1'
+ wrap='no'
+ max='${max}'>
+<text><![CDATA[
+xquery version '3.1';
+let \$collection := '${dbCollection}'
+let \$targetPath := '${fsPath}'
+let \$preserveStructure := true()
+return
+(
+'eXist ver:     [ ' || system:get-version() || ' ] &#10;' ,
+'server env:    [ ' || environment-variable('SERVER') || ' ] &#10;',
+'db collection: [ ' ||  \$collection  || ' ] &#10;',
+'fs target      [ ' || \$targetPath   || ' ] &#10;',
+if( not( file:is-directory( \$targetPath))) then ( file:mkdirs( \$targetPath ) ) else (),
+'-----------------&#10;',
+'   Remote Tasks   &#10;',
+'----------------- &#10;',
+' - Sync DB Files To [ '  ||   \$targetPath   ||  ' ] &#10;',
+file:sync(\$collection, \$targetPath,()),
+'&#10;',
+'------------------------------------------------------------------- &#10;'
+)
+]]></text>
+</query>
+EOF
+)"
+
+curl -s \
+ -H "$auth" \
+ -H "$contentType" \
+ -d "$postData" \
+ $endpoint
+
+echo ' - Revert to Local Host'
+hosts
+echo ' - Sync remote file system data to local project dir'
+rsync -azP ${SSH}:${fsPath}/ ${fsPath}/
+
+postData2="$(
+cat <<EOF
+<query xmlns='http://exist.sourceforge.net/NS/exist'
+ start='1'
+ wrap='no'
+ max='${max}'>
+<text><![CDATA[
+xquery version '3.1';
+let \$collection := '${dbCollection}'
+let \$docsCol := '${dbCollection}/docs'
+let \$mediaCol := '${dbCollection}/media'
+let \$targetPath := '${fsPath}'
+let \$preserveStructure := true()
+return
+(
+'eXist ver:     [ ' || system:get-version() || ' ] &#10;' ,
+'server env:    [ ' || environment-variable('SERVER') || ' ] &#10;',
+'db collection: [ ' ||  \$collection  || ' ] &#10;',
+'fs target      [ ' || \$targetPath   || ' ] &#10;',
+if( not( file:is-directory( \$targetPath))) then ( file:mkdirs( \$targetPath ) ) else (),
+'-----------------&#10;',
+'   Local Tasks   &#10;',
+'----------------- &#10;',
+' - Remove DB Files In Collection [ ' ||  \$docsCol  || ' ] &#10;',
+  for-each( xmldb:get-child-collections( \$docsCol ),
+    function( \$col ){(
+    ' - in collection [ ' || \$docsCol || '/' || \$col || ' ] &#10;',
+    for-each( xmldb:get-child-resources( \$docsCol || '/' || \$col ),
+      function( \$res ){(
+       ' ... removing [ ' || \$res || ' ] &#10;',
+      xmldb:remove( \$docsCol || '/' || \$col, \$res )
+      )})
+    )}
+  ),
+' - Remove DB Files In Collection [ ' ||  \$mediaCol  || ' ] &#10;',
+  for-each( xmldb:get-child-collections( \$mediaCol ),
+    function( \$col ){(
+    ' - in collection [ ' || \$mediaCol || '/' || \$col || ' ] &#10;',
+    for-each( xmldb:get-child-resources( \$mediaCol || '/' || \$col ),
+      function( \$res ){(
+       ' ... removing [ ' || \$res || ' ] &#10;',
+      xmldb:remove( \$mediaCol || '/' || \$col, \$res )
+      )})
+    )}
+  ),
+  let \$seq := xmldb:store-files-from-pattern( \$collection , \$targetPath, '**/*', 'application/xml',\$preserveStructure )
+   return (
+     ' -  restore into eXist from project data files' || '&#10;',
+     '-----------------------------' || '&#10;',
+     for-each( \$seq ,function( \$str ){  ' ... restoring [ ' || \$str ||  ' ] &#10;' })
+     ),
+'&#10;',
+'------------------------------------------------------------------- &#10;'
+)
+]]></text>
+</query>
+EOF
+)"
+
+echo ' - curl to local host'
+curl -s \
+ -H "$auth" \
+ -H "$contentType" \
+ -d "$postData2" \
+ $endpoint
+

@@ -1,6 +1,11 @@
 
 define buildHelp
 =========================================================
+LAST TAG: $(lastTag)
+RELEASE STRATEGY: $(releaseStrategy)
+NEXT TAG: $(nextTag)
+XAR: $(XAR)
+
 BUILD : create a release xar
    < repack package files
     [ build  ] ->
@@ -8,17 +13,18 @@ BUILD : create a release xar
 
 ==========================================================
 
-`make build-help`
 
 endef
-
 
 build-help: export buildHelp:=$(buildHelp)
 build-help:
 	echo "$${buildHelp}"
 
 build: 
+	@echo '##[ $@ ]##'
+	@echo 'recreate package files and put into build folder'
 	@$(MAKE) --silent package
+	@echo 'building $(XAR) and put into deploy folder ' 
 	@$(MAKE) --silent $(XAR)
 
 build-xar-clean: 
